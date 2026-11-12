@@ -1,0 +1,12 @@
+# Passthrough cases: these inputs contain no Telex tone or modifier keys, so the
+# engine must commit them unchanged. They stay valid as transformation is added.
+abc	abc
+hello	hello
+ubuntu	ubuntu
+banana	banana
+Linux	Linux
+Nguyen	Nguyen
+Truong	Truong
+0123456789	0123456789
+a1b2c3	a1b2c3
+hello ban	hello ban

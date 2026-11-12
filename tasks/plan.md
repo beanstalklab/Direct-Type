@@ -1,0 +1,90 @@
+# Implementation Plan: `engine-core`
+
+Status: **awaiting human review** · Source spec: `docs/SPEC-engine-core.md` · Map: `docs/CAPABILITIES.md`
+
+## Overview
+
+Build the Vietnamese transformation engine as a pure Rust library, prove it correct against a golden corpus, expose it over a C ABI, and stop there. The fcitx5 addon (`ime-addon`) is a separate plan that consumes this module.
+
+Scope of this plan: `engine-core` only. The parallel spike (`docs/SPIKE-ime-feasibility.md`) is run by the human and is not on this critical path.
+
+## Architecture Decisions
+
+| # | Decision | Rationale |
+|---|---|---|
+| A1 | Engine returns an `Action`; it never performs I/O | Testable without fcitx5; one core serves Preedit, SurroundingText and ForwardKey strategies unchanged |
+| A2 | Raw keystroke sequence is retained alongside the transformed text | Backspace and auto-restore both require re-deriving from raw input |
+| A3 | Zero runtime crates; static table for precomposed Vietnamese | Hot path is a per-keystroke call; avoids audit surface and build weight (pending human confirmation, T0.1) |
+| A4 | Corpus lives at workspace root, not inside the crate | The addon's integration tests reuse it |
+| A5 | `viet-cli check` exits `0/1/2` | Makes the corpus a CI gate before any UI exists |
+| A6 | `viet-core` is split by method (`telex.rs`, `vni.rs`) over a shared syllable model | Methods differ only in key mapping; tone logic must not be duplicated |
+
+## Task List
+
+### Phase 0 — Decisions and skeleton
+
+- [ ] **T0.1 Record blocking decisions**
+- [x] **T0.2 Bootstrap toolchain** (requires `sudo`)
+- [x] **T0.3 Scaffold Cargo workspace**
+- [x] **T0.4 CI: fmt + clippy + test**
+
+**Checkpoint A:** `cargo test --workspace` runs (0 tests), `clippy -D warnings` clean, CI green.
+
+### Phase 1 — Correctness, vertical slice by slice
+
+Each task ends with something you can type into and observe via `viet-cli`.
+
+- [x] **T1.1 Buffer, boundary, passthrough + corpus runner**
+- [ ] **T1.2 Telex letter modifiers**
+- [ ] **T1.3 Syllable parser + tone index**
+
+**Checkpoint B:** `viet type --method telex "vieejt"` prints `việt`; parser unit tests cover `qu`, `gi`, 1/2/3-vowel nuclei, coda/no-coda.
+
+- [ ] **T1.4 Telex tone keys, tone removal, free tone mark**
+- [ ] **T1.5 Auto-restore and spell-check**
+- [ ] **T1.6 Case handling (lower/UPPER/Title/mixed)**
+
+**Checkpoint C:** `telex-new.tsv` and `telex-old.tsv` green; every rule in spec §3.4 has 3 cases plus a counter-example.
+
+- [ ] **T1.7 VNI method**
+- [ ] **T1.8 SimpleTelex method**
+
+**Checkpoint D:** all four corpus files green; ≥ 2,000 cases; no method-specific logic leaked into `tone.rs`.
+
+### Phase 2 — Robustness
+
+- [ ] **T2.1 Backspace and mid-composition editing**
+- [ ] **T2.2 Property tests + fuzz target**
+- [ ] **T2.3 Benchmarks and allocation check**
+
+**Checkpoint E:** fuzz 10⁶ inputs clean; p99 `feed` < 1 ms; zero allocations after warmup.
+
+### Phase 3 — Boundary for the addon
+
+- [ ] **T3.1 `viet-ffi`: C ABI, header, panics contained**
+- [ ] **T3.2 C smoke test linked against the staticlib**
+
+**Checkpoint F:** `cc`-compiled test program drives the engine through `viet.h`; `ime-addon` can start.
+
+## Risks and Mitigations
+
+| Risk | Impact | Mitigation |
+|---|---|---|
+| Tone-placement edge cases are a long tail; spec §3.4 may be incomplete | High — this is the product | Corpus-first: no rule ships without cases; corpus is reviewable text, not code |
+| Corpus source is not defined (2,000 cases do not appear by themselves) | High — blocks Checkpoint C | T0.1 decides the source; see Open Question Q2. Do not start T1.2 before it is answered |
+| Hand-written rules diverge from UniKey behaviour users expect | Medium | Keep `auto_restore` and `spell_check` as switches, so disagreement is a setting, not a bug report |
+| Zero-dep Unicode table is hand-generated and could be wrong | Medium | Generate it from a cited Unicode data version; test all 134 mappings round-trip |
+| Scope creep into macros/conversion/UI | Medium | Those are explicitly outside the capability map; reject in review |
+| `free_tone_mark` interacts with auto-restore in surprising ways | Low | Implement last in Phase 1; property test that no keystroke is lost |
+
+## Open Questions
+
+- **Q1 (blocks T0.3):** confirm zero runtime crates + static table, vs `unicode-normalization`.
+- **Q2 (blocks T1.2):** corpus source. Options: hand-written rule cases only (slow, ~300 cases); import a public Vietnamese word list and derive Telex input programmatically (fast, needs a licence check); use `fcitx5-bamboo` as an oracle to compare outputs (best coverage, needs a harness — arguably its own task).
+- **Q3 (blocks T1.4):** default `tone_style`: `New` (`hòa/thủy`) proposed.
+- **Q4 (blocks first commit):** project name + licence. `unikey` is a trademark; rename before the repo is published.
+- **Q5:** `free_tone_mark` in v1 — proposed yes.
+
+## Out of Scope
+
+`ime-addon`, `install`, `compat`, settings GUI, macros, encoding conversion, non-Vietnamese languages.

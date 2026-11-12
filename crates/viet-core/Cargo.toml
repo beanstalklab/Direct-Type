@@ -1,0 +1,8 @@
+[package]
+name = "viet-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Pure Vietnamese transformation engine (no I/O, no platform dependencies)"
+
+[dependencies]

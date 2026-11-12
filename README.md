@@ -1,0 +1,50 @@
+# Direct-Type
+
+A multi-language input method for Linux, built around **direct typing**: keystrokes
+reach the application immediately, without a composition buffer, and therefore
+without the underline that composition-based input methods draw.
+
+The first language is Vietnamese. English needs no transformation, so it works as
+the identity path and exercises the language toggle. The engine is a rule pack, not
+a Vietnamese-specific program.
+
+## Status
+
+Pre-alpha. What exists today:
+
+- `crates/viet-core` — the pure transformation engine. Characters commit
+  immediately; the raw word is tracked for later rewriting. Telex, VNI and
+  tone placement are **not implemented yet**.
+- `crates/viet-cli` — `viet-cli type` and `viet-cli check` (golden-corpus runner,
+  exit codes `0`/`1`/`2`).
+- `crates/viet-ffi` — a C ABI over the engine, with panics contained at the boundary.
+- A 10-case passthrough corpus and CI that runs formatting, lint, tests and the corpus.
+
+There is no fcitx5 addon, no installer, and nothing to install yet.
+
+## Build and test
+
+```bash
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+cargo run -p viet-cli -- check tests/corpus
+```
+
+## Documentation
+
+- [`docs/PLAN.md`](docs/PLAN.md) — goals, architecture, milestones, risks
+- [`docs/CAPABILITIES.md`](docs/CAPABILITIES.md) — module map and build order
+- [`docs/SPEC-engine-core.md`](docs/SPEC-engine-core.md) — engine spec and decisions
+- [`docs/SPIKE-ime-feasibility.md`](docs/SPIKE-ime-feasibility.md) — platform feasibility spike
+
+## Why "direct"
+
+Composition-based IMEs build a preedit string that the application renders
+underlined and only commit at a word boundary. That model is why typing Vietnamese
+on Linux feels like it "needs a spacebar", and why some applications show nothing
+until then. Direct typing removes the composition state instead of restyling it.
+
+## Licence
+
+MIT OR Apache-2.0. License files will be added before the first release.

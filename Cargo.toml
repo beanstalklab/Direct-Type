@@ -1,0 +1,12 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/viet-core",
+    "crates/viet-cli",
+    "crates/viet-ffi",
+]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2021"
+rust-version = "1.75"

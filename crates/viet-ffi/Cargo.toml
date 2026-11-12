@@ -1,0 +1,13 @@
+[package]
+name = "viet-ffi"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "C ABI for the Vietnamese engine"
+
+[lib]
+name = "viet"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+viet-core = { path = "../viet-core" }

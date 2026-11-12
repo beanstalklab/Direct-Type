@@ -1,0 +1,10 @@
+# Rust build output
+/target
+
+# No dependencies yet; the lockfile decision is open (tasks/todo.md T0.1).
+# Un-ignore this once the workspace has real dependencies.
+Cargo.lock
+
+# Editor / OS noise
+*.swp
+.DS_Store
