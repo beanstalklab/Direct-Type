@@ -73,6 +73,31 @@ std::string utf8(uint32_t codepoint) {
     return text;
 }
 
+/// An application that has already received every keystroke and is rewritten in place: it
+/// applies the engine's deletions and insertions instead of showing a preedit.
+class DirectTarget {
+public:
+    void apply(const directtype::TypingResult &result) {
+        // Characters, not bytes: `ệ` is three bytes, which is the trap the C ABI documents.
+        for (uint16_t index = 0; index < result.backspaces; ++index) {
+            while (!text_.empty() && (static_cast<unsigned char>(text_.back()) & 0xC0) == 0x80) {
+                text_.pop_back();
+            }
+            if (!text_.empty()) {
+                text_.pop_back();
+            }
+        }
+        text_ += result.commit;
+    }
+
+    void type(uint32_t codepoint) { text_ += utf8(codepoint); }
+
+    const std::string &text() const { return text_; }
+
+private:
+    std::string text_;
+};
+
 /// The addon's typing path, with the key classification and the language toggle it uses.
 class Typer {
 public:
@@ -268,6 +293,47 @@ int main() {
         checkEqual(typer.text(), "vi\xC3\xAA", "changing the method commits the word it had");
         typer.type("d9");
         check(typer.preedit() == "\xC4\x91", "the next word starts fresh, in the new method");
+    }
+
+    // The same keystrokes, through a frontend that rewrites the text it already has. The
+    // deltas must describe the same word as the preedit does, or the two strategies would
+    // disagree about what the user typed.
+    {
+        directtype::TypingSession session(telexConfiguration());
+        DirectTarget target;
+        const std::string keys = "vieejt";
+        for (char key : keys) {
+            const auto codepoint = static_cast<uint32_t>(static_cast<unsigned char>(key));
+            const directtype::KeyAction action = directtype::classify(
+                fcitx::Key::keySymFromUnicode(codepoint), fcitx::KeyState::NoState);
+            const directtype::TypingResult result = session.type(action, codepoint);
+            if (result.consumed) {
+                target.apply(result);
+            } else {
+                target.type(codepoint);
+            }
+        }
+        const directtype::TypingResult ended =
+            session.type(directtype::KeyAction::Boundary, 0);
+        target.apply(ended);
+        checkEqual(target.text(), "vi\xE1\xBB\x87" "t",
+                   "rewriting in place produces the same word as the preedit");
+    }
+
+    // A boundary that restores an invalid word has to restore it in a frontend that rewrites
+    // in place too: the same deltas, applied to the application's text.
+    {
+        directtype::TypingSession session(telexConfiguration());
+        DirectTarget target;
+        for (char key : std::string("asd")) {
+            const auto codepoint = static_cast<uint32_t>(static_cast<unsigned char>(key));
+            target.apply(session.type(directtype::classify(
+                                           fcitx::Key::keySymFromUnicode(codepoint),
+                                           fcitx::KeyState::NoState),
+                                       codepoint));
+        }
+        target.apply(session.type(directtype::KeyAction::Boundary, 0));
+        checkEqual(target.text(), "asd", "auto_restore reaches a rewriting frontend too");
     }
 
     if (failures != 0) {

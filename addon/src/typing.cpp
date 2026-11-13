@@ -45,22 +45,31 @@ std::string TypingSession::takeWord() {
     return word;
 }
 
-void TypingSession::feed(const viet_input_t &input) {
+TypingResult TypingSession::feed(const viet_input_t &input) {
+    TypingResult result;
     if (engine_ == nullptr) {
-        return;
+        return result;
     }
+
     viet_action_t action;
     const char *commit = nullptr;
     viet_engine_feed(engine_, &input, &action, &commit, nullptr);
 
-    // The action is a deletion-and-insert against the text the engine has shown so far, which
-    // is exactly this buffer.
+    // The action is a deletion-and-insert against the text the engine has shown so far. In
+    // preedit mode that text is this buffer; in direct mode it is the application's text, and
+    // the caller applies the same numbers there.
+    result.backspaces = action.backspaces;
+    if (action.commit_length > 0 && commit != nullptr) {
+        result.commit.assign(commit, action.commit_length);
+    }
+    result.consumed = action.consumed != 0;
+
     for (uint16_t index = 0; index < action.backspaces; ++index) {
         popCharacter(word_);
     }
-    if (action.commit_length > 0 && commit != nullptr) {
-        word_.append(commit, action.commit_length);
-    }
+    word_ += result.commit;
+    result.text = word_;
+    return result;
 }
 
 TypingResult TypingSession::type(KeyAction action, uint32_t codepoint) {
@@ -75,24 +84,19 @@ TypingResult TypingSession::type(KeyAction action, uint32_t codepoint) {
             // Nothing of ours to delete: the application deletes its own text.
             return result;
         }
-        feed(simpleInput(1));
-        result.consumed = true;
-        result.text = word_;
-        return result;
+        return feed(simpleInput(1));
     case KeyAction::Character:
-        feed(characterInput(codepoint));
-        result.consumed = true;
-        result.text = word_;
-        return result;
+        return feed(characterInput(codepoint));
     case KeyAction::Boundary:
         if (word_.empty()) {
             return result;
         }
-        // `auto_restore` may rewrite the finished word; that rewrite belongs in the preedit,
-        // and then the whole word is committed.
-        feed(simpleInput(2));
+        // `auto_restore` may rewrite the finished word: the answer is a deletion-and-insert
+        // like any other, and then the word is over.
+        result = feed(simpleInput(2));
         result.ended = true;
-        result.text = takeWord();
+        // The word is over: the next keystroke starts a new one.
+        word_.clear();
         return result;
     }
     return result;

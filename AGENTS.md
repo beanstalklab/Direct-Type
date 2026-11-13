@@ -242,6 +242,12 @@ commands, and do not lower a check to get to green.
 - A preedit option ships with it: `ClientPreedit` (default on) chooses between drawing the
   word in the text field and fcitx5's own preedit window, for applications that misplace the
   client-side one while typing fast.
+- **T4.8 done**: the addon has three strategies, because each fails silently in a different
+  client — `Preedit` (underlined, committed at the boundary), `Backspace` (commit per keystroke,
+  rewrite with forwarded backspaces: the only one that needs nothing from the application but
+  accepting keys) and `SurroundingText` (delete API, used only with valid surrounding text,
+  else backspaces). `TypingResult` carries the deltas and the whole word, and the typing test
+  drives both frontends with the same keystrokes to prove they agree.
 - Checkpoint G remains the only thing left in Phase 4: install on a machine with fcitx5 and
   type `vieejt` in a real application — and now, specifically, in Sublime Text and a
   terminal, where the previous build failed.

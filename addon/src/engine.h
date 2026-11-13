@@ -55,8 +55,13 @@ public:
     void reloadConfig() override;
 
 private:
-    /// Show the word in the preedit, or commit it when the word is finished.
+    /// Publish one keystroke's worth of text: into the preedit, or straight into the
+    /// application by rewriting what is there.
     void publish(const directtype::TypingResult &result, fcitx::InputContext *inputContext);
+
+    /// Apply the engine's deletion-and-insert to the text the application already has.
+    void applyDirectly(const directtype::TypingResult &result,
+                       fcitx::InputContext *inputContext);
 
     /// Finish the word in the preedit by committing it. Used when the word has to end for a
     /// reason the engine does not see: a toggle, a configuration change, a lost focus.

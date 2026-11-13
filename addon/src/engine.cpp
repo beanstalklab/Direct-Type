@@ -92,6 +92,11 @@ std::vector<fcitx::InputMethodEntry> DirectTypeEngine::listInputMethods() {
 
 void DirectTypeEngine::publish(const directtype::TypingResult &result,
                                fcitx::InputContext *inputContext) {
+    if (config_.rewrite.value() != fcitx::DirectTypeRewrite::Preedit) {
+        applyDirectly(result, inputContext);
+        return;
+    }
+
     InputContextTarget target(inputContext, config_.clientPreedit.value());
     if (result.ended) {
         target.showPreedit("");
@@ -101,7 +106,44 @@ void DirectTypeEngine::publish(const directtype::TypingResult &result,
     }
 }
 
+void DirectTypeEngine::applyDirectly(const directtype::TypingResult &result,
+                                     fcitx::InputContext *inputContext) {
+    if (inputContext == nullptr) {
+        return;
+    }
+
+    if (result.backspaces > 0) {
+        // Two ways to delete, and neither works everywhere: the surrounding-text API is one
+        // atomic request that some applications accept and ignore, and forwarded backspace
+        // keys work in any field that accepts keys. That is why the strategy is a setting.
+        const bool surroundingText =
+            config_.rewrite.value() == fcitx::DirectTypeRewrite::SurroundingText &&
+            inputContext->capabilityFlags().test(fcitx::CapabilityFlag::SurroundingText) &&
+            inputContext->surroundingText().isValid();
+        if (surroundingText) {
+            inputContext->deleteSurroundingText(-static_cast<int>(result.backspaces),
+                                                result.backspaces);
+        } else {
+            for (uint16_t index = 0; index < result.backspaces; ++index) {
+                inputContext->forwardKey(fcitx::Key(FcitxKey_BackSpace), false);
+            }
+        }
+    }
+
+    if (!result.commit.empty()) {
+        inputContext->commitString(result.commit);
+    }
+}
+
 void DirectTypeEngine::commitWord(fcitx::InputContext *inputContext) {
+    if (config_.rewrite.value() != fcitx::DirectTypeRewrite::Preedit) {
+        // The application already has the text: there is no preedit to clear.
+        if (session_.hasWord()) {
+            // End the word the way a boundary would, so `auto_restore` still gets its say.
+            applyDirectly(session_.type(directtype::KeyAction::Boundary, 0), inputContext);
+        }
+        return;
+    }
     if (!session_.hasWord()) {
         return;
     }
@@ -199,6 +241,6 @@ void DirectTypeEngine::reloadConfig() {
 }
 
 void DirectTypeEngine::applyConfiguration() {
-    session_.setEngineConfiguration(toEngineConfiguration(config_));
+    session_.setEngineConfiguration(directtype::toEngineConfiguration(config_));
     session_.setVietnameseEnabled(config_.vietnameseEnabled.value());
 }

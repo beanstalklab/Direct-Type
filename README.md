@@ -43,6 +43,12 @@ boundary, Alt+Z to switch between Vietnamese and English, and method, tone place
 `~/.config/fcitx5/conf/directtype.conf`. fcitx5's status area shows the active language next
 to the input method name.
 
+How the word reaches the application is a setting, because Linux clients differ: `Preedit`
+shows the word underlined and commits it at the boundary, `Backspace` commits every keystroke
+and rewrites it with forwarded backspace keys (works in any field that accepts keys), and
+`SurroundingText` rewrites through the surrounding-text API (fastest, and only where the
+application implements it).
+
 ## Install
 
 ```console

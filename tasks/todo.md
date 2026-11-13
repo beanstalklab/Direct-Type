@@ -1017,6 +1017,53 @@ plus the human session.
 `docs/SPEC-engine-core.md`
 **Scope:** M
 
+## T4.8 — Three ways to reach the application
+
+**Description:** The preedit made Sublime Text work but reintroduced the underline and the
+space-to-finish. The two direct strategies exist and are now selectable, because no single one
+works in every application.
+
+**Acceptance criteria:**
+- [x] `Rewrite` option: `Preedit`, `Backspace`, `SurroundingText`
+- [x] `Backspace` and `SurroundingText` commit each keystroke and rewrite through the engine's
+      deltas: no preedit, no boundary needed for the text to appear
+- [x] `SurroundingText` is used only when the application advertises the capability **and**
+      offers valid surrounding text, else it falls back to forwarded backspaces
+- [x] Both shapes of the answer come from one place: `TypingResult` carries the deltas and the
+      whole word, and the typing test drives a rewriting frontend with the deltas to prove
+      they describe the same word as the preedit
+- [ ] Which strategy is right in Sublime Text, a terminal and Chrome — **human check**
+
+**Decisions recorded in this task:**
+
+- The strategy is a setting rather than a guess. The three options are the three mechanisms a
+  Linux client may or may not implement, and the failure modes are silent: a client that
+  advertises `Preedit` and draws nothing (Sublime), one that advertises surrounding text and
+  drops the deletion (Sublime again), and one where forwarded keys are ignored. Detecting any
+  of that from the engine side is guesswork, so the user gets the switch and we learn the
+  default from real sessions.
+- `Backspace` is the only strategy that needs nothing from the application but accepting keys,
+  which is why it is the one to try where the others failed. It rewrites with one forwarded
+  `BackSpace` per deleted character — the engine counts characters, so a `ệ` is one keystroke,
+  not three.
+- The deltas stay authoritative: `TypingSession` applies them to its own buffer *and* reports
+  them, so the preedit frontend and the rewriting frontend cannot drift. The test drives both
+  against the same keystrokes and compares the text.
+- `commitWord` (toggle, settings change, focus loss) ends the word through a boundary action in
+  direct mode too, so `auto_restore` still gets its say; in preedit mode it commits the buffer.
+
+**Verification:**
+```bash
+ctest --test-dir addon/build --output-on-failure
+bash scripts/build_deb.sh
+```
+plus the human check, per application.
+
+**Dependencies:** T4.7
+**Files:** `addon/src/config.h`, `addon/src/typing.h`, `addon/src/typing.cpp`,
+`addon/src/engine.h`, `addon/src/engine.cpp`, `addon/tests/typing_check.cpp`
+**Scope:** M
+
 ### Checkpoint G — installable
 - [ ] `./install.sh` on a clean machine, then `vieejt` types `việt` in a real app
 - [ ] GNOME Wayland, KDE Wayland and X11 each verified by a human

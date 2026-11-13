@@ -17,6 +17,14 @@ namespace fcitx {
 FCITX_CONFIG_ENUM(DirectTypeMethod, Telex, SimpleTelex, Vni);
 FCITX_CONFIG_ENUM(DirectTypeToneStyle, Old, New);
 
+/// How the word reaches the application while it is being typed.
+///
+/// There is no single answer on Linux: a preedit is drawn by the application (and some lie
+/// about being able to), the surrounding-text API is optional (and some accept the commit and
+/// drop the deletion), and forwarded backspace keys work in any field that accepts keys. The
+/// strategies have different costs, so the choice is the user's.
+FCITX_CONFIG_ENUM(DirectTypeRewrite, Preedit, Backspace, SurroundingText);
+
 } // namespace fcitx
 
 namespace directtype {
@@ -35,6 +43,9 @@ FCITX_CONFIGURATION(
                                                   fcitx::DirectTypeMethod::Telex};
     fcitx::Option<fcitx::DirectTypeToneStyle> toneStyle{
         this, "ToneStyle", _("Tone placement"), fcitx::DirectTypeToneStyle::New};
+    fcitx::Option<fcitx::DirectTypeRewrite> rewrite{
+        this, "Rewrite", _("How the word reaches the application"),
+        fcitx::DirectTypeRewrite::Preedit};
     fcitx::Option<bool> autoRestore{this, "AutoRestore",
                                     _("Restore a word that is not Vietnamese"), true};
     fcitx::Option<bool> spellCheck{this, "SpellCheck",

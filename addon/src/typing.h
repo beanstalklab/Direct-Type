@@ -11,12 +11,21 @@
 namespace directtype {
 
 /// What one keystroke means for the application.
+///
+/// It carries both shapes of the same answer, because a frontend needs one or the other:
+/// a preedit frontend shows `text`, while a frontend that rewrites committed text applies
+/// `backspaces` and `commit` to what the application already has.
 struct TypingResult {
     /// The key belongs to the input method and must not reach the application.
     bool consumed = false;
-    /// The word finished here: `text` is what to commit, and the session is empty again.
+    /// The word finished here: commit it (either `text`, or `backspaces` + `commit`) and the
+    /// session is empty again.
     bool ended = false;
-    /// The word to show in the preedit, or the finished word when `ended` is true.
+    /// Characters to delete before committing, for a frontend that rewrites committed text.
+    uint16_t backspaces = 0;
+    /// Text to insert, for a frontend that rewrites committed text.
+    std::string commit;
+    /// The whole word, for a frontend that keeps a preedit.
     std::string text;
 };
 
@@ -61,8 +70,9 @@ public:
     void reset();
 
 private:
-    /// Feed one input and apply its deletion-and-insert to `word_`.
-    void feed(const viet_input_t &input);
+    /// Feed one input, apply its deletion-and-insert to `word_`, and report both shapes of
+    /// the answer.
+    TypingResult feed(const viet_input_t &input);
 
     viet_engine_t *engine_;
     std::string word_;
