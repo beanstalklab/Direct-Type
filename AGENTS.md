@@ -76,7 +76,7 @@ When SOLID conflicts with clarity, prefer clarity and say why in the change.
 
 ## Verification
 
-Current phase: **Phase 3 done — the fcitx5 addon (T0.2) is the next build step**. The commands below are the only accepted
+Current phase: **Phase 4 — `ime-addon` (T4.1–T4.6), plan written and awaiting approval**. The commands below are the only accepted
 verification; run them from the repository root. Do not substitute different
 commands, and do not lower a check to get to green.
 
@@ -171,8 +171,11 @@ commands, and do not lower a check to get to green.
   panic inside the feed is contained. The C test also found that `backspaces` counts
   characters, not bytes — `delete_characters` in `smoke.c` is the reference for the addon.
   Checkpoint F is met.
-- Nothing is installable yet: no fcitx5 addon, no installer, no toggle key, no tray. T0.2
-  (the C++ addon on this ABI) is the next build step; the installer and toggle follow.
+- Nothing is installable yet: no fcitx5 addon, no installer, no toggle key, no tray.
+  The addon work is broken down in `tasks/todo.md` T4.1–T4.6 and `tasks/plan.md` Phase 4:
+  addon that loads, direct typing through the C ABI, language toggle, configuration, status
+  indicator, one-command install. fcitx5 5.1.7 has no `fcitx5_addon()` CMake macro, so the
+  targets are declared by hand — read the addon template before writing `CMakeLists.txt`.
 - `test` → `tét` stays `tét`: `tét` is real Vietnamese (`nét`, `mét`, `sét` share its
   rhyme), so no spelling rule may rewrite it. English typing needs the toggle key, or
   `free_tone_mark` off. Do not "fix" this by weakening the tables; the corpus case

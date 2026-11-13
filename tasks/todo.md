@@ -619,7 +619,157 @@ bash scripts/c_smoke_test.sh
 - [x] CI runs it, so a header/implementation drift fails the build
 
 ### Checkpoint F — module done
-- [ ] Spec §9 success criteria 1–6 all demonstrably met
-- [ ] `docs/SPEC-engine-core.md` status set to `implemented`
-- [ ] `docs/PLAN.md` documents table updated
-- [ ] Human reviews before starting `ime-addon`
+- [x] Spec §9 criteria 1, 2, 5 and 6 demonstrably met (corpus, clippy, `Action` expressiveness,
+      `viet-cli type "vieejt"` on a clean checkout); 3 and 4 are the fuzz run and the p99
+      benchmark, still blocked on tooling approval
+- [x] `docs/SPEC-engine-core.md` status set to `implemented`
+- [x] `docs/PLAN.md` documents table updated
+- [x] Human reviews before starting `ime-addon` (approved 2026-11-13)
+
+---
+
+# Phase 4 — `ime-addon`: an input method you can install
+
+The engine is done and its C ABI is verified from C. This phase is the fcitx5 addon that
+turns it into something a person types with, then the one-command install.
+
+**Ground truth checked before planning** (2026-11-13): `pkg-config --modversion Fcitx5Core`
+is `5.1.7`, headers are under `/usr/include/Fcitx5/{Core,Config,Utils}`, and the installed
+CMake package exports imported targets only — there is **no** `fcitx5_addon()` helper
+macro in 5.1.7, so the addon targets are declared by hand. Read the fcitx5 addon template
+for the current layout before writing `CMakeLists.txt`, and do not guess the ABI names.
+
+## T4.1 — Addon that loads
+
+**Description:** A CMake project under `addon/` that builds `directtype.so` as an fcitx5
+addon exposing one input method, whose key handler currently forwards every key
+unchanged. This is the slice that proves the toolchain, the addon metadata and the
+loading path before any engine call is wired in.
+
+**Acceptance criteria:**
+- [ ] `cmake -S addon -B addon/build && cmake --build addon/build` produces the module
+- [ ] `cmake --install` places it under the prefix with its `directtype.conf` metadata
+- [ ] The addon registers one input method named for the product (unique name, no clash
+      with `fcitx5`'s own methods) and appears in `fcitx5-configtool`'s input method list
+- [ ] Every key is forwarded unchanged, so turning it on cannot break typing
+
+**Verification:**
+```bash
+cmake -S addon -B addon/build && cmake --build addon/build
+ldd addon/build/directtype.so | grep -E 'fcitx|viet'
+```
+plus a human check that the engine shows up in `fcitx5-configtool`.
+
+**Dependencies:** T3.2
+**Files:** `addon/CMakeLists.txt`, `addon/src/addon.cpp`, `addon/src/engine.h`,
+`addon/src/engine.cpp`, `addon/directtype.conf.in`
+**Scope:** M
+
+## T4.2 — Direct typing through the C ABI
+
+**Description:** Map fcitx5 key events to `viet_input_t`, call `viet_engine_feed`, and
+apply the result: delete `backspaces` **characters** with
+`InputContext::deleteSurroundingText`, then `commitString`. Send `Boundary` for space,
+enter, tab, punctuation and focus loss, and forward every key the engine does not consume.
+This is the slice where the product promise becomes real: no preedit, no underline.
+
+**Acceptance criteria:**
+- [ ] `vieejt` types `việt` in a real application on GNOME Wayland, KDE Wayland and X11
+- [ ] Nothing is underlined: the engine never sets a preedit string
+- [ ] `deleteSurroundingText` deletes characters, not bytes (the C smoke test's
+      `delete_characters` is the reference)
+- [ ] Space and punctuation still reach the application after the rewrite
+- [ ] Focus loss sends `Boundary`, so a word is never left half-transformed
+
+**Verification:**
+```bash
+bash scripts/c_smoke_test.sh        # the ABI this addon uses
+```
+plus the human typing in three applications on each of the three session types.
+
+**Dependencies:** T4.1
+**Files:** `addon/src/engine.cpp`, `addon/src/engine.h`
+**Scope:** M
+
+## T4.3 — Language toggle
+
+**Description:** Vietnamese and English as two states of one input method, with one
+obvious way to switch: fcitx5's own input method switch, plus a configurable toggle key
+handled inside the addon. The state must be visible and must survive a restart.
+
+**Acceptance criteria:**
+- [ ] Switching to English forwards every key untouched (no transformation, no restore)
+- [ ] The toggle key is configurable and does not swallow the key in English mode
+- [ ] A fresh engine is used for a new word, so a toggle never rewrites the previous word
+- [ ] The choice is persisted in the addon configuration
+
+**Verification:** human: type `vieejt`, toggle, type `test`, toggle back, type `vieejt`.
+
+**Dependencies:** T4.2
+**Files:** `addon/src/engine.cpp`, `addon/src/config.cpp`, `addon/src/config.h`,
+`addon/directtype.conf.in`
+**Scope:** M
+
+## T4.4 — Configuration UI
+
+**Description:** Expose the engine's five knobs through fcitx5's configuration: method
+(Telex, Simple Telex, VNI), tone style (old, new), `auto_restore`, `spell_check`,
+`free_tone_mark`, plus the toggle key. `Config::set_config` requires a reset when the
+method changes, and the addon must honour that.
+
+**Acceptance criteria:**
+- [ ] Every field of `viet_config_t` is settable from `fcitx5-configtool`
+- [ ] Changing the method resets the engine, so a half-typed word is not rewritten by the
+      new rule pack
+- [ ] Defaults match the engine's: Telex, new tone style, `auto_restore` on,
+      `spell_check` off, `free_tone_mark` on
+- [ ] Settings survive a restart
+
+**Verification:** human: change each option, type a word that shows it took effect.
+
+**Dependencies:** T4.2
+**Files:** `addon/src/config.cpp`, `addon/src/config.h`, `addon/src/engine.cpp`,
+`addon/directtype.conf.in`
+**Scope:** M
+
+## T4.5 — Tray indicator
+
+**Description:** The user must be able to see which language and method is active without
+opening a settings window. Use fcitx5's own status area rather than drawing a tray icon:
+the addon reports a display name and, if fcitx5's UI supports it, a per-language label.
+
+**Acceptance criteria:**
+- [ ] The fcitx5 tray shows Vietnamese or English, and the method name when it matters
+- [ ] The label follows the toggle immediately
+- [ ] No second tray icon and no panel plugin of our own
+
+**Verification:** human: toggle and watch the status area in GNOME and KDE.
+
+**Dependencies:** T4.3
+**Files:** `addon/src/engine.cpp`
+**Scope:** S
+
+## T4.6 — One-command install
+
+**Description:** `install.sh` builds the engine and the addon, installs both into the
+user's fcitx5 prefix, enables the addon, and restarts fcitx5. Uninstall is one flag. No
+root for a per-user install; `sudo` for a system-wide one.
+
+**Acceptance criteria:**
+- [ ] On a clean Ubuntu with fcitx5 and its dev headers, `./install.sh` ends with a working
+      Vietnamese input method, with no manual step
+- [ ] `./install.sh --uninstall` removes everything it added
+- [ ] Running it twice is safe (idempotent)
+- [ ] It fails loudly, with the package name to install, when a dependency is missing
+
+**Verification:** a container or VM with fcitx5, plus the human's desktop once.
+
+**Dependencies:** T4.1–T4.5
+**Files:** `install.sh`, `README.md`
+**Scope:** M
+
+### Checkpoint G — installable
+- [ ] `./install.sh` on a clean machine, then `vieejt` types `việt` in a real app
+- [ ] GNOME Wayland, KDE Wayland and X11 each verified by a human
+- [ ] Uninstall leaves no trace
+- [ ] Human review before publishing the repository

@@ -68,6 +68,26 @@ Each task ends with something you can type into and observe via `viet-cli`.
 
 **Checkpoint F:** met — `scripts/c_smoke_test.sh` compiles `tests/smoke.c`, links it against `libviet.a` and `libviet.so`, and runs it green in CI. `ime-addon` can start.
 
+### Phase 4 — `ime-addon`: an installable input method
+
+Breakdown in `tasks/todo.md` T4.1–T4.6. Vertical slices: an addon that loads (T4.1), then
+direct typing through the C ABI (T4.2), then the language toggle (T4.3), configuration
+(T4.4), the status indicator (T4.5), and one-command install (T4.6).
+
+- [ ] **T4.1 Addon that loads**
+- [ ] **T4.2 Direct typing through the C ABI**
+- [ ] **T4.3 Language toggle**
+- [ ] **T4.4 Configuration UI**
+- [ ] **T4.5 Tray indicator**
+- [ ] **T4.6 One-command install**
+
+**Checkpoint G:** `./install.sh` on a clean machine, then `vieejt` types `việt` in a real
+application, on GNOME Wayland, KDE Wayland and X11.
+
+Risks new to this phase: fcitx5 5.1.7 has no `fcitx5_addon()` CMake macro (targets are
+declared by hand); `deleteSurroundingText` availability and behaviour differs per toolkit
+and session; and a per-user install must find fcitx5's addon directory without root.
+
 ## Risks and Mitigations
 
 | Risk | Impact | Mitigation |
