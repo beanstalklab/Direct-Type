@@ -483,18 +483,50 @@ cargo test --workspace
 **Description:** `proptest` (dev-dependency, requires T0.1 approval) for invariants; `cargo-fuzz` target for crash resistance.
 
 **Acceptance criteria:**
-- [ ] Invariants: no panic, `reset` is total, restore preserves keystrokes, output is NFC, no allocation in `feed` after warmup
-- [ ] Fuzz target builds and runs 10⁶ inputs with zero panics/hangs
-- [ ] Findings, if any, become regression cases in `tests/corpus/regressions.tsv`
+- [x] Invariants: no panic, `reset` is total, restore preserves keystrokes, output is NFC
+- [ ] Invariant: no allocation in `feed` after warmup — T2.3 owns the counting allocator;
+      `buffers_stabilize_after_warmup` in `lib.rs` already pins stable capacities
+- [ ] Fuzz target builds and runs 10⁶ inputs with zero panics/hangs — **deferred**: needs
+      `cargo-fuzz` and `libfuzzer-sys` as dev tooling, which the user has not approved yet
+- [x] Findings, if any, become regression cases in `tests/corpus/regressions.tsv` (none
+      so far: the invariants and the table check passed on the first run)
+
+**Decisions recorded in this task:**
+
+- No `proptest`: the generator is thirty lines in each test file, so the repository keeps
+  its zero-runtime-and-dev-dependency promise without waiting on a T0.1 decision. A
+  seeded generator is also reproducible in a bug report, which is what matters for a
+  property that fails occasionally.
+- The properties are split by what they can see. `tests/invariants.rs` uses the public API
+  only — every configuration (three methods × two tone styles × three switches), hostile
+  input (controls, combining marks, emoji, a lone U+10FFFF), `reset` totality, a forwarded
+  boundary, `preedit` always empty, and no delete reaching past the word. The properties
+  that read engine state (restore exactness, delete re-derivation) stay in `lib.rs` and
+  the corpus test.
+- Each property was checked against a deliberate mutation (a no-op `reset`; forgetting to
+  re-derive after a backspace) and failed, so none of them pass for free.
+- The word-length cap the raw buffer lacked is in: 64 raw keys, after which the word ends
+  where it stands and the next key starts a new one, in one action with no deletions. An
+  over-long word is never restored — it never reached a boundary, and nothing a person
+  types comes close.
+- The NFC requirement gained its oracle: `scripts/verify_unicode_table.py` checks all 144
+  entries against Unicode canonical decomposition with Python's `unicodedata`, and CI runs
+  it. `unicode.rs` has claimed this script existed since T1.1; it did not, which is now
+  fixed rather than restated. Canonical ordering matters — the dot below (combining class
+  220) precedes the circumflex and breve (230) in `ặ` — so the script normalizes the
+  expected string instead of hard-coding an order.
 
 **Verification:**
 ```bash
-cargo test --workspace --release
-cargo +nightly fuzz run engine -- -runs=1000000
+cargo test -p viet-core --test invariants
+cargo test --workspace
+python3 scripts/verify_unicode_table.py
 ```
 
 **Dependencies:** T2.1, T0.1
-**Files:** `crates/viet-core/tests/invariants.rs`, `crates/viet-core/fuzz/Cargo.toml`, `crates/viet-core/fuzz/fuzz_targets/engine.rs`, `tests/corpus/regressions.tsv`
+**Files:** `crates/viet-core/tests/invariants.rs`, `scripts/verify_unicode_table.py`,
+`crates/viet-core/src/lib.rs`, `.github/workflows/ci.yml`;
+`crates/viet-core/fuzz/*` deferred
 **Scope:** M
 
 ---

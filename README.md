@@ -35,6 +35,7 @@ cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 cargo run -p viet-cli -- check tests/corpus
+python3 scripts/verify_unicode_table.py    # the table against Unicode
 ```
 
 Type through the engine without any GUI:

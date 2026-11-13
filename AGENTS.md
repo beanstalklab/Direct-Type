@@ -76,7 +76,7 @@ When SOLID conflicts with clarity, prefer clarity and say why in the change.
 
 ## Verification
 
-Current phase: **T2.2 (property tests and fuzz target)**. The commands below are the only accepted
+Current phase: **T2.3 (benchmarks and allocation check)**. The commands below are the only accepted
 verification; run them from the repository root. Do not substitute different
 commands, and do not lower a check to get to green.
 
@@ -141,8 +141,24 @@ commands, and do not lower a check to get to green.
   and after a restored boundary, for a delete that brings a tone back (`asz → as` →
   `á`), and for `spell_check` re-applying to the shorter word. 88 core tests, 5 CLI
   integration tests.
-- Next: T2.2 — property tests and a fuzz target: no panic on arbitrary input, `reset`
-  total, NFC output, plus the word-length cap the raw-key buffer still lacks.
+- **T2.2 partly done**: `crates/viet-core/tests/invariants.rs` holds the properties the
+  public API can state — every configuration (3 methods x 2 tone styles x 3 switches),
+  hostile input (controls, combining marks, emoji, U+10FFFF), `reset` totality, a
+  forwarded boundary, `preedit` always empty, and no delete reaching past the word. No
+  `proptest`: the generator is a seeded LCG per test file, so the zero-dependency promise
+  holds and a failure is reproducible. Each property was checked against a deliberate
+  mutation and failed.
+- The raw-key buffer is capped at 64 keys: the word ends where it stands and the next key
+  starts a new one, in one action with no deletions. 89 core tests, 5 invariant tests,
+  5 CLI tests.
+- `scripts/verify_unicode_table.py` now exists and CI runs it: 144 table entries checked
+  against Unicode canonical decomposition. `unicode.rs` claimed this script since T1.1
+  and the claim was false — fixed, not restated.
+- Not done, blocked on approval: the `cargo-fuzz` target (`libfuzzer-sys`, nightly) and
+  the `criterion` benchmark. The user chose dependency-free work first, so Checkpoint E's
+  fuzz run stays open.
+- Next: T2.3 — the counting-allocator allocation check can be done with no dependency;
+  the p99 latency benchmark needs the `criterion` decision.
 - `test` → `tét` stays `tét`: `tét` is real Vietnamese (`nét`, `mét`, `sét` share its
   rhyme), so no spelling rule may rewrite it. English typing needs the toggle key, or
   `free_tone_mark` off. Do not "fix" this by weakening the tables; the corpus case

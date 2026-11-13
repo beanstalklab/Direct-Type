@@ -54,7 +54,8 @@ Each task ends with something you can type into and observe via `viet-cli`.
 ### Phase 2 — Robustness
 
 - [x] **T2.1 Backspace and mid-composition editing**
-- [ ] **T2.2 Property tests + fuzz target**
+- [ ] **T2.2 Property tests + fuzz target** — invariants, the word cap and the Unicode
+      table check are done; the fuzz target waits on `cargo-fuzz` approval
 - [ ] **T2.3 Benchmarks and allocation check**
 
 **Checkpoint E:** fuzz 10⁶ inputs clean; p99 `feed` < 1 ms; zero allocations after warmup.

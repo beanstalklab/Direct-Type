@@ -245,6 +245,13 @@ Every rule above must be backed by at least three corpus cases, including a coun
 - `spell_check` is re-applied after a delete, because the shorter word may be spellable
   again: `aaa` stays `aaa` while it cannot become a syllable, and one delete later `aa`
   is `â`.
+- A word holds at most 64 raw keys (`MAXIMUM_WORD_KEYS`). A Vietnamese syllable is at
+  most seven letters and a rule pack at most doubles that, so nothing a person types
+  comes close; the cap is there so a long run of keys without a boundary — a pasted
+  token, a stuck key — cannot grow the buffer without end. A word that reaches the cap
+  ends where it stands (its text stays exactly as shown, since it never reached a
+  boundary and so is never restored) and the next key starts a new word, in one action
+  with no deletions.
 
 `auto_restore` (default on) is decided at the boundary, because that is the first
 moment the word is known to be finished:
@@ -392,8 +399,8 @@ crates/viet-core/
   src/vni.rs                    VNI rule pack: digits for tones and diacritics
   src/spelling.rs               closed onset/nucleus/coda inventories, auto_restore guards
   src/unicode.rs                Vietnamese precomposed table, case handling
-  tests/invariants.rs           property tests, T2.2
-  fuzz/                         cargo-fuzz target, T2.2 (dev only)
+  tests/invariants.rs           properties over every configuration and any input
+  fuzz/                         cargo-fuzz target, planned (needs a dev dependency)
 crates/viet-cli/src/main.rs
 crates/viet-cli/src/corpus.rs   corpus runner behind `viet-cli check`
 crates/viet-ffi/
@@ -409,6 +416,8 @@ tests/corpus/telex-case-old.tsv  case handling with old tone placement
 tests/corpus/vni-new.tsv         VNI: digits, tones, placement, words
 tests/corpus/vni-old.tsv         VNI with old tone placement
 tests/corpus/simple-telex-new.tsv  Simple Telex: circumflex, stroke, `w` for `ư`, tones
+scripts/verify_unicode_table.py Python 3 stdlib: checks every table entry against Unicode
+                                canonical decomposition; CI runs it
 scripts/corpus_tool.py          planned; Python 3.14 stdlib only: sort, dedupe, validate TSV
 ```
 
@@ -465,7 +474,8 @@ Conventions: `snake_case`, `CamelCase` types, no `unwrap`/`expect`/`panic!` outs
 |---|---|---|
 | Corpus (golden) | `tests/corpus.rs` | Vietnamese correctness on ≥ 2,000 cases across 4 method/style combinations |
 | Unit | `#[cfg(test)]` per module | parser, tone-index, spelling-inventory and restore-guard edge cases in isolation |
-| Property | `tests/invariants.rs` | no panic on arbitrary char streams; `reset` is total; output is always NFC |
+| Property | `tests/invariants.rs` | every configuration: no panic on arbitrary input, `reset` is total, a consumed key commits precomposed text, a boundary is forwarded, no delete reaches past the word |
+| NFC oracle | `scripts/verify_unicode_table.py` | the closed table is real Unicode: every spelling is precomposed and decomposes to its base, quality mark and tone |
 | Fuzz | `fuzz/` | crash/hang resistance, run manually before releases |
 | Bench | `benches/` | p99 keystroke latency < 1 ms (target: < 10 µs) |
 
@@ -481,8 +491,9 @@ expectation, and asserts that no output contains a combining mark (the NFC guara
 
 Restore is a property, not a case list: `viet_core::tests::a_restore_never_loses_or_reorders_a_keystroke`
 types 2,000 generated words twice — once with `auto_restore`, once without — and
-requires that every difference is exactly the keystrokes. It lives in `lib.rs` until
-`tests/invariants.rs` exists in T2.2.
+requires that every difference is exactly the keystrokes. It stays in `lib.rs` because
+it reads the engine's own raw buffer, which an integration test cannot see;
+`tests/invariants.rs` holds the properties the public API can state.
 
 Coverage expectation: 100% of branch points in `tone.rs` and `syllable.rs` (these are the bug farms). No coverage target elsewhere.
 

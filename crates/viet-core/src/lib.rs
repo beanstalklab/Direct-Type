@@ -71,6 +71,14 @@ impl Default for Config {
     }
 }
 
+/// How many raw keys one word may hold.
+///
+/// A Vietnamese syllable is at most seven letters, and a rule pack at most doubles that,
+/// so nothing a person types comes close. The cap is there so a long run of keys without
+/// a boundary — a pasted token, a stuck key — cannot grow the buffer without end. A word
+/// that reaches it ends as it stands, and the next key starts a new one.
+const MAXIMUM_WORD_KEYS: usize = 64;
+
 /// One key event handed to the engine.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Input {
@@ -142,6 +150,9 @@ impl Engine {
     pub fn feed(&mut self, input: Input) -> Action<'_> {
         match input {
             Input::Char(character) => {
+                if self.raw_keys.chars().count() >= MAXIMUM_WORD_KEYS {
+                    return self.start_new_word(character);
+                }
                 self.raw_keys.push(character);
                 self.rewrite()
             }
@@ -203,6 +214,20 @@ impl Engine {
             preedit: "",
             boundary: false,
         }
+    }
+
+    /// End the word that reached [`MAXIMUM_WORD_KEYS`] and start the next one with
+    /// `key`.
+    ///
+    /// The over-long word is not given back the way `auto_restore` gives back a finished
+    /// word: it never reached a boundary, and no person types one. Its text stays exactly
+    /// as the application already shows it, so no character is lost, and the buffer is
+    /// free again.
+    fn start_new_word(&mut self, key: char) -> Action<'_> {
+        self.raw_keys.clear();
+        self.shown_text.clear();
+        self.raw_keys.push(key);
+        self.rewrite()
     }
 
     /// Give back the keystrokes of the word that just ended.
@@ -815,6 +840,34 @@ mod tests {
         assert_eq!(action.backspaces, 1);
         assert_eq!(action.commit, "e");
         assert!(!action.boundary);
+    }
+
+    #[test]
+    fn a_word_that_reaches_the_key_cap_ends_and_the_next_key_starts_over() {
+        let mut engine = engine();
+        let mut text = String::new();
+        for _ in 0..MAXIMUM_WORD_KEYS {
+            perform(&mut text, engine.feed(Input::Char('a')));
+        }
+        assert_eq!(engine.raw_keys.chars().count(), MAXIMUM_WORD_KEYS);
+        let characters_before = text.chars().count();
+
+        // The cap ends the word where it stands and starts a new one with this key, in
+        // one action: nothing on screen is deleted and the new key is committed.
+        let action = engine.feed(Input::Char('a'));
+        let (backspaces, commit) = (action.backspaces, action.commit);
+        text.push_str(commit);
+        assert_eq!(backspaces, 0);
+        assert_eq!(text.chars().count(), characters_before + 1);
+        assert_eq!(engine.raw_keys, "a");
+
+        // The buffer stays bounded however long the run of keys is. The text grows by
+        // less than a key per keystroke because a pair of `a`s becomes one `â`, so the
+        // count is not asserted here; the cap test above is the one about losing text.
+        for _ in 0..1_000 {
+            perform(&mut text, engine.feed(Input::Char('a')));
+            assert!(engine.raw_keys.chars().count() <= MAXIMUM_WORD_KEYS);
+        }
     }
 
     #[test]

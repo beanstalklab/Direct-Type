@@ -13,6 +13,9 @@ jobs:
       - name: Add lint components
         run: rustup component add clippy rustfmt
 
+      - name: Check the Vietnamese table against Unicode
+        run: python3 scripts/verify_unicode_table.py
+
       - name: Check formatting
         run: cargo fmt --all --check
 
