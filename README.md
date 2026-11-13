@@ -15,8 +15,9 @@ Pre-alpha. What exists today:
 - `crates/viet-core` — the pure transformation engine. Characters commit
   immediately; the raw word is tracked and re-derived on every key, so a Telex
   letter modifier rewrites what the application already shows (`aa` → `â`) without
-  a composition buffer. Telex letter modifiers work; tone keys, VNI and Simple
-  Telex's restricted rule set are **not implemented yet**.
+  a composition buffer. Telex letter modifiers work, and the syllable parser plus
+  tone-placement rules are in place; tone keys, VNI and Simple Telex's restricted
+  rule set are **not implemented yet**.
 - `crates/viet-cli` — `viet-cli type` and `viet-cli check` (golden-corpus runner,
   exit codes `0`/`1`/`2`).
 - `crates/viet-ffi` — a C ABI over the engine, with panics contained at the boundary.

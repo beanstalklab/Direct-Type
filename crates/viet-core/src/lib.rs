@@ -12,7 +12,9 @@
 
 #![forbid(unsafe_code)]
 
+mod syllable;
 mod telex;
+mod tone;
 mod unicode;
 
 /// Input method used to interpret keystrokes.

@@ -156,15 +156,22 @@ cargo run -p viet-cli -- check tests/corpus
 
 ## T1.3 — Syllable parser and tone index
 
-**Description:** Parse the buffer into `onset · medial · nucleus · coda` and compute the tone position per spec §3.4. This task produces the parser and `tone_index()` only; it does not apply tones yet.
+**Description:** Parse the buffer into `onset · nucleus · coda` and compute the tone position per spec §3.4. This task produces the parser and `tone_index()` only; it does not apply tones yet. The medial is folded into the nucleus — see the decision note below.
 
 **Acceptance criteria:**
-- [ ] `qu` and `gi` treated as onsets (`quà`, `quý`, `già`, `gì`)
-- [ ] Nucleus of length 1/2/3 parsed correctly with and without coda
-- [ ] `tone_index` returns the spec §3.4 position for: `toán`, `tiếng`, `cái`, `của`, `khuỷu`, `ướ`
-- [ ] `ToneStyle::Old/New` differ only for `oa/oe/uy` open syllables (`hoà` vs `hòa`)
-- [ ] Invalid sequences return `None`, never panic
-- [ ] 100% branch coverage in `tone.rs` and `syllable.rs`
+- [x] `qu` and `gi` treated as onsets (`qua`, `quy`, `gia`, `giư`); `gi` only when a vowel follows, so `gì` keeps `i` in the nucleus
+- [x] Nucleus of length 1/2/3 parsed correctly with and without coda
+- [x] `tone_index` returns the spec §3.4 position for `toán`, `tiếng`, `cái`, `của`, `khuỷu`, `ướ` (tested through their untoned spellings, since tone application is T1.4)
+- [x] `ToneStyle::Old/New` differ only for `oa/oe/uy` open syllables (`hoà` vs `hòa`), with `cái`/`của` as counter-examples
+- [x] Invalid sequences return `None`, never panic
+- [x] Every branch of `tone.rs` and `syllable.rs` exercised by a test (no coverage tool is installed; installing one is an ask-first item)
+
+**Decisions recorded in this task:** no separate medial field — the glide belongs
+to the nucleus, because otherwise `hoa` would have one nucleus vowel and `khuỷu`
+two, and both tone placements would be wrong (spec §3.3 updated). The style rule is
+restricted to `oa`/`oe`/`uy`; the earlier spec sample applied it to every two-vowel
+open syllable, which would have produced `caí` (spec §3.4 and §6 corrected). The
+parser is structural: onset/coda *validity* is the spelling question T1.5 answers.
 
 **Verification:**
 ```bash

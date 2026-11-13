@@ -76,9 +76,9 @@ When SOLID conflicts with clarity, prefer clarity and say why in the change.
 
 ## Verification
 
-Current phase: **T1.3 (syllable parser and tone index)**. The commands below are the
-only accepted verification; run them from the repository root. Do not substitute
-different commands, and do not lower a check to get to green.
+Current phase: **T1.4 (Telex tone keys)**. The commands below are the only accepted
+verification; run them from the repository root. Do not substitute different
+commands, and do not lower a check to get to green.
 
 ### Current state (2026-11-13)
 
@@ -90,8 +90,14 @@ different commands, and do not lower a check to get to green.
   `viet-cli check` work with exit codes `0/1/2`, and CI runs the corpus check.
 - **T1.2 done**: Telex letter modifiers (`aa/ee/oo`, `w`, `aw/ow/uw`, `dd`, `[`, `]`,
   `uow → ươ`) with doubling to undo; a modifier reports `backspaces` and rewrites
-  text the application already shows. 56 corpus cases, 23 tests, CI green.
-- Next: T1.3 — syllable parser and `tone_index`, no tone application yet.
+  text the application already shows. 56 corpus cases, CI green.
+- **T1.3 done**: `syllable::parse` (onset/nucleus/coda, `qu` and `gi` as onsets,
+  fixed-array so it never allocates) and `tone::tone_index` (quality diacritic, coda,
+  then open-syllable rules; `oa/oe/uy` are the only style-dependent pairs). Not
+  wired into the engine yet: both modules carry a scoped `#![allow(dead_code)]` that
+  T1.4 must remove. 35 core tests, CI green.
+- Next: T1.4 — tone keys `s f r x j`, `z` removes a tone, `free_tone_mark`.
+  Checkpoint B (`vieejt` → `việt`) closes with it.
 - Not implemented, by design: tone keys (T1.4), auto-restore and spell-check (T1.5),
   case matrix (T1.6), VNI (T1.7), Simple Telex's restricted rule set (T1.8). Those
   methods currently pass letters through unchanged.

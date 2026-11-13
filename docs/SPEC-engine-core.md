@@ -133,7 +133,21 @@ Letter modifiers in Telex, in the detail T1.2 pinned down:
 
 ### 3.3 Syllable model
 
-Parse the buffer into `onset · medial · nucleus · coda`, with a validity table for each. `qu` and `gi` are onsets, not vowel clusters. This is what makes `quà`, `quý`, `già`, `gì` place tones correctly.
+Parse the buffer into `onset · nucleus · coda`. `qu` and `gi` are onsets, not vowel
+clusters. This is what makes `quà`, `quý`, `già`, `gì` place tones correctly. `gi`
+is an onset only when a vowel follows it (`già`), so `gì` keeps `i` as its nucleus.
+
+There is deliberately no separate medial field (decided in T1.3). A glide stays in
+the nucleus: `hoa` has two nucleus vowels, which is exactly why `hòa` and `hoà`
+disagree, and `khuỷu` has three, which is why its tone lands on the middle one.
+Splitting the glide out would give `hoa` one nucleus vowel and `khuỷu` two, and both
+tone placements would be wrong. `qu` and `gi` are onsets, which is the only place
+the glide does not belong to the nucleus.
+
+The parser checks structure, not spelling: at most three onset consonants, one to
+three nucleus vowels, at most two coda consonants, and no vowel after the coda.
+Whether `xt` is a real coda, or `ngh` a real onset, is a spelling question that
+`spell_check` answers in T1.5.
 
 ### 3.4 Tone placement
 
@@ -142,7 +156,7 @@ Order of rules:
 1. If any nucleus vowel carries a quality diacritic (`ă â ê ô ơ ư`), place the tone on it; if several, use the last one that the orthography allows (`ướ`, `uyễ`).
 2. Otherwise, if the syllable has a coda, place the tone on the last nucleus vowel (`toán`, `tiếng`).
 3. Otherwise (open syllable): one vowel → that vowel; two → first (`cái`, `của`); three → second (`khuỷu`).
-4. `ToneStyle::Old` vs `New` changes only the `oa / oe / uy` open-syllable case (`hoà` vs `hòa`).
+4. `ToneStyle::Old` vs `New` changes only the `oa / oe / uy` open-syllable case (`hoà` vs `hòa`, `thuỷ` vs `thủy`). Every other open pair keeps the first vowel under both styles: `cái` and `của` must not move.
 
 Every rule above must be backed by at least three corpus cases, including a counter-example. If implementation and corpus disagree, the corpus wins only when it cites a source in its comment.
 
@@ -230,15 +244,21 @@ The runner feeds each input character as `Input::Char`, then `Input::Boundary`, 
 
 ```rust
 // Tone placement: quality diacritic wins, then coda, then open-syllable rules.
-pub(crate) fn tone_index(syl: &Syllable, style: ToneStyle) -> Option<usize> {
-    if let Some(i) = syl.last_quality_vowel() {
-        return Some(i);
+pub(crate) fn tone_index(syllable: &Syllable, style: ToneStyle) -> Option<usize> {
+    if let Some(index) = last_quality_vowel(syllable) {
+        return Some(index);
     }
-    match (syl.has_coda(), syl.nucleus.len()) {
-        (true, _) => Some(syl.nucleus.len() - 1),
-        (false, 1) => Some(0),
-        (false, 2) => Some(if style == ToneStyle::Old { 1 } else { 0 }),
-        (false, 3) => Some(1),
+    if syllable.has_coda() {
+        return syllable.nucleus_length.checked_sub(1);
+    }
+    match syllable.nucleus_length {
+        0 => None,
+        1 => Some(0),
+        // Only `oa`, `oe`, `uy` move between the conventions; `cái` does not.
+        2 => Some(usize::from(
+            style == ToneStyle::Old && has_old_style_placement(syllable),
+        )),
+        3 => Some(1),
         _ => None,
     }
 }

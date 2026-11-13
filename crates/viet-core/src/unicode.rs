@@ -40,6 +40,14 @@ const MARKED_LETTERS: &[(char, char, LetterMark)] = &[
     ('Đ', 'D', LetterMark::Stroke),
 ];
 
+/// The mark `character` carries, or `None` when it is plain.
+pub(crate) fn letter_mark(character: char) -> Option<LetterMark> {
+    MARKED_LETTERS
+        .iter()
+        .find(|(marked, _, _)| *marked == character)
+        .map(|(_, _, mark)| *mark)
+}
+
 /// The plain letter under `character`, or `character` itself when it is already
 /// plain. Keeps the case, because callers restore a letter rather than normalize it.
 pub(crate) fn base_letter(character: char) -> char {
@@ -74,8 +82,11 @@ mod tests {
     fn every_marked_letter_round_trips() {
         for (marked, base, mark) in MARKED_LETTERS {
             assert_eq!(base_letter(*marked), *base);
+            assert_eq!(letter_mark(*marked), Some(*mark));
             assert_eq!(compose(*base, *mark), Some(*marked));
         }
+        assert_eq!(letter_mark('a'), None);
+        assert_eq!(letter_mark('ơ'), Some(LetterMark::Horn));
     }
 
     #[test]

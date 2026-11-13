@@ -36,7 +36,7 @@ Each task ends with something you can type into and observe via `viet-cli`.
 
 - [x] **T1.1 Buffer, boundary, passthrough + corpus runner**
 - [x] **T1.2 Telex letter modifiers**
-- [ ] **T1.3 Syllable parser + tone index**
+- [x] **T1.3 Syllable parser + tone index**
 
 **Checkpoint B:** `viet type --method telex "vieejt"` prints `việt`; parser unit tests cover `qu`, `gi`, 1/2/3-vowel nuclei, coda/no-coda.
 
