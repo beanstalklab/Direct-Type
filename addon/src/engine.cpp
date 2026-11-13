@@ -30,8 +30,8 @@ constexpr const char *configurationPath = "conf/directtype.conf";
 /// the text until the word is finished, which is what makes a modifier reliable.
 class InputContextTarget final : public directtype::TextTarget {
 public:
-    explicit InputContextTarget(fcitx::InputContext *inputContext)
-        : inputContext_(inputContext) {}
+    InputContextTarget(fcitx::InputContext *inputContext, bool clientPreedit)
+        : inputContext_(inputContext), clientPreedit_(clientPreedit) {}
 
     void showPreedit(const std::string &text) override {
         if (inputContext_ == nullptr) {
@@ -42,7 +42,14 @@ public:
         } else {
             fcitx::Text preedit(text);
             preedit.setCursor(static_cast<int>(text.size()));
-            if (inputContext_->capabilityFlags().test(fcitx::CapabilityFlag::Preedit)) {
+            // Client-side preedit is drawn by the application, at its own cursor. Some
+            // applications misplace it while typing fast (Chrome among them), so it is an
+            // option: turning it off moves the preedit into fcitx5's own window, which is
+            // positioned from the cursor rectangle the frontend reports.
+            const bool clientPreedit =
+                clientPreedit_ &&
+                inputContext_->capabilityFlags().test(fcitx::CapabilityFlag::Preedit);
+            if (clientPreedit) {
                 inputContext_->inputPanel().setClientPreedit(preedit);
             } else {
                 inputContext_->inputPanel().setPreedit(preedit);
@@ -59,6 +66,7 @@ public:
 
 private:
     fcitx::InputContext *inputContext_;
+    bool clientPreedit_;
 };
 
 } // namespace
@@ -84,7 +92,7 @@ std::vector<fcitx::InputMethodEntry> DirectTypeEngine::listInputMethods() {
 
 void DirectTypeEngine::publish(const directtype::TypingResult &result,
                                fcitx::InputContext *inputContext) {
-    InputContextTarget target(inputContext);
+    InputContextTarget target(inputContext, config_.clientPreedit.value());
     if (result.ended) {
         target.showPreedit("");
         target.commit(result.text);
@@ -97,7 +105,7 @@ void DirectTypeEngine::commitWord(fcitx::InputContext *inputContext) {
     if (!session_.hasWord()) {
         return;
     }
-    InputContextTarget target(inputContext);
+    InputContextTarget target(inputContext, config_.clientPreedit.value());
     target.showPreedit("");
     target.commit(session_.takeWord());
 }

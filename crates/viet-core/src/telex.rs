@@ -8,7 +8,11 @@
 //! carries it depends on the whole syllable, so a tone key only records *which* tone is
 //! wanted and the fold places the mark once the word is complete.
 
-use crate::input::{append_literal, horn_u_o_pair, mark_trailing, Origin, RulePack};
+use crate::input::{
+    append_literal, horn_u_o_pair, horn_u_o_pair_at, mark_letter_at, mark_trailing, Origin,
+    RulePack,
+};
+use crate::syllable;
 use crate::unicode::{base_letter, LetterMark, Tone};
 
 /// Full Telex: tone keys `s f r x j`, `z` removes a tone, and `w`, `aa`, `ee`, `oo`,
@@ -159,17 +163,49 @@ fn append_w(output: &mut String, key: char, origin: Origin, more_letters_follow:
         'a' => mark_trailing(output, LetterMark::Breve, key, origin),
         'u' => mark_trailing(output, LetterMark::Horn, key, origin),
         'o' => horn_u_o_pair(output, key, origin, more_letters_follow),
-        // After a consonant, `w` is a letter of its own.
-        _ => {
-            output.push(horned_u_with_case(key));
-            return Origin::ModifierKey(key);
-        }
+        // Not a letter `w` can mark; the look-back below decides.
+        _ => None,
     };
-    match applied {
-        Some(new_origin) => new_origin,
-        // `ô` + `w` cannot gain a horn; keeping the key literal beats inventing a
-        // letter that Vietnamese does not spell.
-        None => append_literal(output, key),
+    if let Some(new_origin) = applied {
+        return new_origin;
+    }
+
+    // `w` is Telex's utility key: a user types it at the end of the word as naturally as right
+    // after the vowel, so `ddonw` is `đơn` and `anw` is `ăn`. Look back for the last letter a
+    // horn or a breve can land on before giving up.
+    if let Some(new_origin) = mark_last_vowel(output, key, origin) {
+        return new_origin;
+    }
+
+    if syllable::is_vowel(previous) {
+        // A vowel that already carries a mark cannot take this one; the key stays literal
+        // (`oow` is `ôw`), as §3.2 requires.
+        return append_literal(output, key);
+    }
+
+    // Nothing to mark after a consonant: `w` is a letter of its own there (`hw` is `hư`).
+    output.push(horned_u_with_case(key));
+    Origin::ModifierKey(key)
+}
+
+/// Mark the last letter of the word that a `w` can mark, and report where the mark went.
+///
+/// Searches backwards, so the vowel closest to the keystroke wins (`hoanw` is `hoăn`). The
+/// `uo` pair keeps its rule from the trailing case: horning the `o` of a `uo` also horns the
+/// `u`, which is why `dduongw` is `đương` and not `đuơng`.
+fn mark_last_vowel(output: &mut String, key: char, origin: Origin) -> Option<Origin> {
+    let mut target: Option<usize> = None;
+    for (index, character) in output.chars().enumerate() {
+        if matches!(base_letter(character).to_ascii_lowercase(), 'a' | 'o' | 'u') {
+            target = Some(index);
+        }
+    }
+    let index = target?;
+    match base_letter(output.chars().nth(index)?).to_ascii_lowercase() {
+        'a' => mark_letter_at(output, index, LetterMark::Breve, key, origin),
+        'u' => mark_letter_at(output, index, LetterMark::Horn, key, origin),
+        'o' => horn_u_o_pair_at(output, index, key, origin, true),
+        _ => None,
     }
 }
 
@@ -309,6 +345,31 @@ mod tests {
         for (raw, expected) in cases {
             assert_eq!(transform(raw), expected, "raw {raw:?}");
         }
+    }
+
+    #[test]
+    fn w_marks_a_vowel_that_has_a_coda_after_it() {
+        // `w` is a utility key: typing it at the end of the word is as natural as typing it
+        // right after the vowel, and both have to reach the same word.
+        let cases = [
+            ("ddonw", "đơn"),
+            ("ddow", "đơ"),
+            ("anw", "ăn"),
+            ("awn", "ăn"),
+            ("banw", "băn"),
+            ("dduongw", "đương"),
+            ("dduowng", "đương"),
+            ("quaw", "quă"),
+            ("hunw", "hưn"),
+        ];
+        for (raw, expected) in cases {
+            assert_eq!(transform(raw), expected, "raw {raw:?}");
+        }
+        // A word with no vowel to mark still gets `ư`, which is what makes `hw` reach `hư`.
+        assert_eq!(transform("hw"), "hư");
+        assert_eq!(transform("w"), "ư");
+        // Undoing the look-back mark puts the vowel back and keeps the key where it was typed.
+        assert_eq!(transform("ddonww"), "đonw");
     }
 
     #[test]

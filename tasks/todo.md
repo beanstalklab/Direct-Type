@@ -964,6 +964,9 @@ deletions being dropped: our design committed every keystroke and relied on
 
 **Acceptance criteria:**
 - [x] The word is held in the preedit until the word boundary, then committed
+- [x] The preedit can be drawn in the text field or in fcitx5's own window (option
+      `ClientPreedit`, default on), because some applications misplace the client-side one
+      while typing fast
 - [x] A boundary key commits the word (after `auto_restore` gets its say) and is forwarded
 - [x] Backspace inside the word deletes a keystroke from the preedit, not a character of the
       application; with no word, it is forwarded
@@ -994,6 +997,11 @@ deletions being dropped: our design committed every keystroke and relied on
   and the character-versus-byte deletion lesson moved into `TypingSession`.
 - Version bumped to `0.0.1` so the fix upgrades the installed package instead of needing a
   reinstall.
+- `ClientPreedit` was added after the same session reported the underlined word appearing in
+  the wrong place in Chrome while typing fast: client-side preedit is drawn by the
+  application at its own cursor, and the panel preedit is positioned by fcitx5 from the
+  cursor rectangle the frontend reports. It is an option because the in-text preedit is
+  better where it works.
 
 **Verification:**
 ```bash

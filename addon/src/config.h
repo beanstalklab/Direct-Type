@@ -42,6 +42,9 @@ FCITX_CONFIGURATION(
                                    false};
     fcitx::Option<bool> freeToneMark{this, "FreeToneMark",
                                      _("Accept the tone key anywhere in a syllable"), true};
+    fcitx::Option<bool> clientPreedit{
+        this, "ClientPreedit",
+        _("Draw the word in the text field instead of a separate preedit window"), true};
     fcitx::Option<bool> vietnameseEnabled{this, "VietnameseEnabled", _("Vietnamese"), true};
     fcitx::Option<fcitx::Key> toggleKey{this, "ToggleKey",
                                         _("Toggle Vietnamese/English"),

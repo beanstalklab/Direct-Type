@@ -52,9 +52,13 @@ pub(crate) enum Origin {
     Literal,
     /// The previous key became the trailing letter itself (`w` → `ư`, `[` → `ơ`).
     ModifierKey(char),
-    /// The previous keystroke added a diacritic to the trailing letter.
+    /// The previous keystroke added a diacritic to a letter of the word.
     Marked {
         mark: LetterMark,
+        /// Character position of the marked letter. Not always the last one: `w` can mark a
+        /// vowel that has a coda after it (`ddonw` is `đơn`), so the undo has to know which
+        /// letter it is undoing.
+        letter_index: usize,
         /// The same keystroke also horned the `u` in front of an `o`.
         also_horned_u: bool,
     },
@@ -252,16 +256,48 @@ pub(crate) fn mark_trailing(
     key: char,
     origin: Origin,
 ) -> Option<Origin> {
-    if matches!(origin, Origin::Marked { mark: applied, .. } if applied == mark) {
+    let letter_index = output.chars().count().checked_sub(1)?;
+    mark_letter_at(output, letter_index, mark, key, origin)
+}
+
+/// Replace the character at `letter_index` with `character`.
+fn replace_letter(output: &mut String, letter_index: usize, character: char) -> Option<()> {
+    let (byte_index, existing) = output.char_indices().nth(letter_index)?;
+    let mut encoded = [0u8; 4];
+    output.replace_range(
+        byte_index..byte_index + existing.len_utf8(),
+        character.encode_utf8(&mut encoded),
+    );
+    Some(())
+}
+
+/// Add `mark` to the letter at `letter_index`, or undo the previous keystroke if it marked
+/// that same letter with the same mark.
+///
+/// The index matters because a modifier is not always typed next to the letter it marks:
+/// `w` after a coda marks a vowel in the middle of the word (`ddonw` → `đơn`), and undoing
+/// that keystroke has to restore that vowel rather than the last letter.
+pub(crate) fn mark_letter_at(
+    output: &mut String,
+    letter_index: usize,
+    mark: LetterMark,
+    key: char,
+    origin: Origin,
+) -> Option<Origin> {
+    if matches!(
+        origin,
+        Origin::Marked { mark: applied, letter_index: marked_at, .. }
+            if applied == mark && marked_at == letter_index
+    ) {
         undo_mark(output, origin, key);
         return Some(Origin::Literal);
     }
-    let previous = output.chars().next_back()?;
-    let marked = compose(previous, mark)?;
-    output.pop();
-    output.push(marked);
+    let character = output.chars().nth(letter_index)?;
+    let marked = compose(character, mark)?;
+    replace_letter(output, letter_index, marked)?;
     Some(Origin::Marked {
         mark,
+        letter_index,
         also_horned_u: false,
     })
 }
@@ -280,59 +316,80 @@ pub(crate) fn horn_u_o_pair(
     origin: Origin,
     also_horn_u: bool,
 ) -> Option<Origin> {
+    let o_index = output.chars().count().checked_sub(1)?;
+    horn_u_o_pair_at(output, o_index, key, origin, also_horn_u)
+}
+
+/// Horn the `o` at `o_index` and, when asked, the `u` in front of it.
+pub(crate) fn horn_u_o_pair_at(
+    output: &mut String,
+    o_index: usize,
+    key: char,
+    origin: Origin,
+    also_horn_u: bool,
+) -> Option<Origin> {
     if matches!(
         origin,
-        Origin::Marked {
-            mark: LetterMark::Horn,
-            ..
-        }
+        Origin::Marked { mark: LetterMark::Horn, letter_index, .. } if letter_index == o_index
     ) {
         undo_mark(output, origin, key);
         return Some(Origin::Literal);
     }
 
-    let horned_o = compose(output.chars().next_back()?, LetterMark::Horn)?;
-    output.pop();
+    let o = output.chars().nth(o_index)?;
+    let horned_o = compose(o, LetterMark::Horn)?;
+    replace_letter(output, o_index, horned_o)?;
 
     let mut also_horned_u = false;
-    if also_horn_u {
-        if let Some(before_o) = output.chars().next_back() {
-            if base_letter(before_o).eq_ignore_ascii_case(&'u') {
-                if let Some(horned_u) = compose(before_o, LetterMark::Horn) {
-                    output.pop();
-                    output.push(horned_u);
-                    also_horned_u = true;
-                }
+    if also_horn_u && o_index > 0 {
+        let u_index = o_index - 1;
+        let u = output.chars().nth(u_index)?;
+        if base_letter(u).eq_ignore_ascii_case(&'u') {
+            if let Some(horned_u) = compose(u, LetterMark::Horn) {
+                replace_letter(output, u_index, horned_u)?;
+                also_horned_u = true;
             }
         }
     }
-    output.push(horned_o);
 
     Some(Origin::Marked {
         mark: LetterMark::Horn,
+        letter_index: o_index,
         also_horned_u,
     })
 }
 
 /// Undo the diacritic the previous keystroke added and keep `key` literal.
 pub(crate) fn undo_mark(output: &mut String, origin: Origin, key: char) {
-    let horned_both = matches!(
-        origin,
-        Origin::Marked {
-            also_horned_u: true,
-            ..
-        }
-    );
-    if horned_both {
-        // One keystroke marked two letters, so undoing it restores both.
-        if let Some(horned_o) = output.pop() {
-            if let Some(horned_u) = output.pop() {
-                output.push(base_letter(horned_u));
-            }
-            output.push(base_letter(horned_o));
-        }
-    } else if let Some(marked) = output.pop() {
-        output.push(base_letter(marked));
+    let Origin::Marked {
+        letter_index,
+        also_horned_u,
+        ..
+    } = origin
+    else {
+        return;
+    };
+
+    // One keystroke may have marked two letters; undo restores whichever it marked, at the
+    // positions it marked them, and only then keeps the key itself.
+    let first = if also_horned_u {
+        letter_index.saturating_sub(1)
+    } else {
+        letter_index
+    };
+    let last = letter_index;
+    for index in (first..=last).rev() {
+        let Some(character) = output.chars().nth(index) else {
+            continue;
+        };
+        let Some((byte_index, _)) = output.char_indices().nth(index) else {
+            continue;
+        };
+        let mut encoded = [0u8; 4];
+        output.replace_range(
+            byte_index..byte_index + character.len_utf8(),
+            base_letter(character).encode_utf8(&mut encoded),
+        );
     }
     output.push(key);
 }

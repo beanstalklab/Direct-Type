@@ -61,3 +61,18 @@ UW	Ư
 W	Ư
 VIEE	VIÊ
 Viee	Viê
+#
+# `w` is a utility key: a user types it at the end of the word as naturally as right after
+# the vowel, so both orders reach the same word. Reported from a real session, where
+# `ddonw` came back as the raw keystrokes because the engine only looked at the letter in
+# front of the `w`.
+ddonw	đơn
+anw	ăn
+banw	băn
+dduongw	đương
+dduowng	đương
+quaw	quă
+hunw	hưn
+# Undoing the mark leaves `đonw`, which is not a syllable, so the boundary gives the
+# keystrokes back — the same rule as `aass`. The undo itself is pinned in the `telex` tests.
+ddonww	ddonww
