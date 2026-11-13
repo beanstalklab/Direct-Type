@@ -2,18 +2,18 @@
 
 Project rules for agents working in this repository.
 
-## Status: planning
+## Status: engine-core in progress
 
-This project has **no agreed implementation yet**. `docs/PLAN.md` is the source of
-truth for goals, architecture, milestones and open questions. Read it before
-proposing code.
+The greenfield Rust engine is being built task by task from `tasks/plan.md`;
+`docs/PLAN.md` remains the source of truth for goals, architecture, milestones and
+open questions. Read both before proposing code.
 
-The current source tree (`src/unikey/`, `pyproject.toml`) is scaffolding from a
-project template, **not** a description of the target stack. Do not infer
-architecture, package layout or runtime language from it.
+The Python scaffold from the original project template has been removed. Do not
+infer the product architecture from anything the template left behind.
 
 Stack is still a draft. Treat every stack statement in `docs/PLAN.md` as
-"current decision, may change", and confirm before depending on it.
+"current decision, may change", and confirm before depending on it. The fcitx5
+addon, the installer and the C++ build do not exist yet.
 
 ## Core rules
 
@@ -22,7 +22,7 @@ Stack is still a draft. Treat every stack statement in `docs/PLAN.md` as
 - Follow the loaded skill's workflow fully; do not skip its required steps.
 - When a plan decision changes, update `docs/PLAN.md` in the same change.
 - Do not add runtime dependencies, build tooling or lockfiles without asking first.
-- Do not present the placeholder scaffold as the product architecture.
+- Do not present placeholder or template code as the product architecture.
 
 ## Naming, comments and documentation
 

@@ -47,4 +47,9 @@ until then. Direct typing removes the composition state instead of restyling it.
 
 ## Licence
 
-MIT OR Apache-2.0. License files will be added before the first release.
+Licensed under either of
+
+- Apache License, Version 2.0 ([`LICENSE-APACHE`](LICENSE-APACHE))
+- MIT licence ([`LICENSE-MIT`](LICENSE-MIT))
+
+at your option.

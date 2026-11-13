@@ -3,6 +3,7 @@ name = "viet-cli"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+license.workspace = true
 description = "Command-line driver for the Vietnamese engine (corpus runner)"
 
 [dependencies]
