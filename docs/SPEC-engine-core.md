@@ -156,6 +156,24 @@ Letter modifiers in Telex, in the detail T1.2 pinned down:
 - A letter that already carries a different mark keeps it and the key stays literal: `awa → ăa`, `oow → ôw`.
 - Case follows the letter that carries the mark, which is the first of the pair: `AA → Â`, `aA → â`, `VIEE → VIÊ`. §3.7 has the whole rule, including what an undo does to case.
 
+VNI, in the detail T1.7 pinned down (key table from `fcitx5-bamboo`,
+`input_method_def.go`, MIT):
+
+- A digit adds a quality diacritic to the letter in front of it: `a6 → â`, `e6 → ê`,
+  `o6 → ô`, `a8 → ă`, `o7 → ơ`, `u7 → ư`, `d9 → đ`. `7` on a `uo` pair follows the same
+  lookahead as Telex's `w` (`uo7ng → ương`, `thuo7 → thuơ`).
+- A digit that cannot do its job stays a digit: `n6`, `b8`, `k9`, `a67` (the letter
+  already carries a different mark). A keystroke that silently disappears is worse than
+  one the user can see.
+- Doubling a digit undoes the mark and keeps one digit: `a66 → a6`, `d99 → d9`,
+  `uo77 → uo7`. Doubling a tone digit behaves the same way, because the user typed the
+  digit again: `a11 → a1`.
+- `0` removes the tone and the tone digit does **not** come back: `a10 → a`, not `a1`.
+  This is the one place VNI and Telex deliberately differ. A Telex tone key is a letter,
+  so `asz → as` leaves plausible text behind; a leftover digit is noise.
+- Nothing leaks between methods: `w`, `[`, `]`, `s`, `z` are ordinary letters in VNI,
+  and `1`–`9` are ordinary characters in Telex (`telex` stays `telex`).
+
 ### 3.3 Syllable model
 
 Parse the buffer into `onset · nucleus · coda`. `qu` and `gi` are onsets, not vowel
@@ -344,12 +362,13 @@ Cargo.toml                      workspace: members = crates/*
 rust-toolchain.toml             pinned stable + clippy + rustfmt
 crates/viet-core/
   src/lib.rs                    public API: Config, Method, ToneStyle, Input, Action, Engine
+  src/input.rs                  shared fold over a word's raw keys, RulePack seam
   src/syllable.rs               onset/nucleus/coda parsing (structure only)
   src/tone.rs                   tone placement rules 3.4
-  src/telex.rs                  Telex fold: letter modifiers and tone keys
+  src/telex.rs                  Telex rule pack: letter modifiers and tone keys
+  src/vni.rs                    VNI rule pack: digits for tones and diacritics
   src/spelling.rs               closed onset/nucleus/coda inventories, auto_restore guards
   src/unicode.rs                Vietnamese precomposed table, case handling
-  src/vni.rs                    planned, T1.7
   tests/invariants.rs           property tests, T2.2
   fuzz/                         cargo-fuzz target, T2.2 (dev only)
 crates/viet-cli/src/main.rs
@@ -364,8 +383,9 @@ tests/corpus/telex-tone-old.tsv  tone keys, old tone style
 tests/corpus/telex-restore.tsv   auto_restore: invalid words, undone modifiers, limits
 tests/corpus/telex-case.tsv      case handling: lower, Title, upper, mixed
 tests/corpus/telex-case-old.tsv  case handling with old tone placement
+tests/corpus/vni-new.tsv         VNI: digits, tones, placement, words
+tests/corpus/vni-old.tsv         VNI with old tone placement
 tests/corpus/simple-telex-new.tsv  planned, T1.8
-tests/corpus/vni-new.tsv           planned, T1.7
 scripts/corpus_tool.py          planned; Python 3.14 stdlib only: sort, dedupe, validate TSV
 ```
 

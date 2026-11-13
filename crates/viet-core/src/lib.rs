@@ -20,6 +20,7 @@ mod syllable;
 mod telex;
 mod tone;
 mod unicode;
+mod vni;
 
 /// Input method used to interpret keystrokes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -237,10 +238,13 @@ impl Engine {
             Method::Telex => {
                 input::apply::<telex::Telex>(&self.raw_keys, &self.config, &mut self.scratch)
             }
-            // Simple Telex has a narrower modifier set (T1.8) and VNI its own keys
-            // (T1.7); until those land, their words reach the application unchanged
-            // rather than half-transformed by the wrong rule pack.
-            Method::SimpleTelex | Method::Vni => {
+            Method::Vni => {
+                input::apply::<vni::Vni>(&self.raw_keys, &self.config, &mut self.scratch)
+            }
+            // Simple Telex has a narrower modifier set (T1.8): until it lands, its
+            // words reach the application unchanged rather than half-transformed by
+            // the full Telex rule pack.
+            Method::SimpleTelex => {
                 self.scratch.clear();
                 self.scratch.push_str(&self.raw_keys);
             }

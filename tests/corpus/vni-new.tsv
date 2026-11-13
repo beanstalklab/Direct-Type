@@ -1,0 +1,241 @@
+# VNI, spec §3.2 and §3.4. Digits carry everything: `1`–`5` are the tones (`1` sắc,
+# `2` huyền, `3` hỏi, `4` ngã, `5` nặng), `0` removes a tone, and `6`–`9` add the quality
+# diacritics. The key table is the one `fcitx5-bamboo` ships (`input_method_def.go`,
+# MIT): `6` is `AEO_ÂÊÔ`, `7` is `UO_ƯƠ`, `8` is `A_Ă`, `9` is `D_Đ`.
+#
+# A digit that cannot do its job stays a digit, because a keystroke that disappears is
+# worse than one the user can see: `n6` is `n6`, not `n`.
+#
+# `6` adds the circumflex, `8` the breve, `9` the stroke.
+a6	â
+e6	ê
+o6	ô
+a8	ă
+d9	đ
+A6	Â
+E6	Ê
+O6	Ô
+A8	Ă
+D9	Đ
+o6i	ôi
+u7a	ưa
+a8n	ăn
+d9i	đi
+d9a6u	đâu
+d9a6y	đây
+d9o6ng	đông
+#
+# `7` horns `u` and `o`, and horns both of a `uo` pair while the word goes on, exactly as
+# Telex's `w` does: one keystroke has to reach `ương`. A word that ends at the `7` keeps
+# the `uơ` rhyme of `thuở`, `quơ` and `huơ`.
+u7	ư
+o7	ơ
+uo7	uơ
+duo7	duơ
+thuo7	thuơ
+thuo73	thuở
+huo7	huơ
+quo7	quơ
+uo7ng	ương
+d9uo7ng	đương
+u7o7	ươ
+u7o71	ướ
+#
+# Doubling a digit undoes its mark and keeps one digit, the way `aaa` is `aa` in Telex.
+a66	a6
+e66	e6
+o66	o6
+a88	a8
+o77	o7
+u77	u7
+d99	d9
+A66	A6
+D99	D9
+uo77	uo7
+#
+# The five tones, lower and upper case.
+a1	á
+a2	à
+a3	ả
+a4	ã
+a5	ạ
+e1	é
+e2	è
+e3	ẻ
+e4	ẽ
+e5	ẹ
+i1	í
+i2	ì
+i3	ỉ
+i4	ĩ
+i5	ị
+o1	ó
+o2	ò
+o3	ỏ
+o4	õ
+o5	ọ
+u1	ú
+u2	ù
+u3	ủ
+u4	ũ
+u5	ụ
+y1	ý
+y2	ỳ
+y3	ỷ
+y4	ỹ
+y5	ỵ
+A1	Á
+A2	À
+A3	Ả
+A4	Ã
+A5	Ạ
+E1	É
+I1	Í
+O1	Ó
+U1	Ú
+Y1	Ý
+#
+# §3.4 rule 1: a quality diacritic takes the mark, whatever the coda does.
+a61	ấ
+a62	ầ
+a63	ẩ
+a64	ẫ
+a65	ậ
+a81	ắ
+a82	ằ
+e61	ế
+e62	ề
+o61	ố
+o62	ồ
+o71	ớ
+o72	ờ
+u71	ứ
+u72	ừ
+d9ie6u2	điều
+d9ie6u5	điệu
+#
+# §3.4 rule 2: a closed syllable marks its last nucleus vowel.
+ban1	bán
+ban2	bàn
+ban3	bản
+ban4	bãn
+ban5	bạn
+toan1	toán
+hoan2	hoàn
+tie6ng1	tiếng
+tie6n2	tiền
+ngu7o7i2	người
+d9u7o7c5	được
+tru7o7ng2	trường
+tru7o7ng1	trướng
+ho6m	hôm
+hoc5	học
+sinh	sinh
+thanh2	thành
+pho61	phố
+a8n	ăn
+a8m	ăm
+co7m	cơm
+uo61ng	uống
+nu7o7c1	nước
+d9oc5	đọc
+sach1	sách
+vie6t1	viết
+d9ep5	đẹp
+manh5	mạnh
+me6n1	mến
+#
+# §3.4 rule 3: an open syllable marks its first of two vowels, its middle of three.
+cai1	cái
+cai2	cài
+cai3	cải
+cai4	cãi
+cai5	cại
+cua3	của
+mua2	mùa
+tai2	tài
+mau1	máu
+may1	máy
+vao2	vào
+coi2	còi
+buo6i3	buổi
+chie6u2	chiều
+khuyu3	khuỷu
+#
+# §3.4 rule 4: `oa / oe / uy` in an open syllable follow the tone style. Every other
+# open pair keeps its first vowel under both styles, which `cai` and `cua` above pin.
+hoa1	hóa
+hoa2	hòa
+hoa3	hỏa
+khoe3	khỏe
+thuy2	thùy
+thuy3	thủy
+thuy5	thụy
+quy1	quý
+#
+# `0` removes the tone. The tone digit was consumed by the tone and does not come back:
+# a digit left behind would be noise, unlike a Telex tone letter (`asz → as`).
+a10	a
+a20	a
+a30	a
+a40	a
+a50	a
+A10	A
+ban10	ban
+ban20	ban
+vie6t50	viêt
+#
+# Words, including the ones whose rhyme is `uơ` and the three-vowel ones.
+vie6t5	việt
+Vie6t5	Việt
+VIE6T5	VIỆT
+tie6ng1	tiếng
+Tie6ng1	Tiếng
+TIE6NG1	TIẾNG
+nguye6n4	nguyễn
+Nguye6n4	Nguyễn
+quye6n2	quyền
+Quye6n2	Quyền
+chuye6n5	chuyện
+khuya	khuya
+khuyu3	khuỷu
+ngoa8n2	ngoằn
+ngoeo2	ngoèo
+oa8t1	oắt
+u7o7	ươ
+ye6u	yêu
+ye6u2	yều
+thu7o7ng	thương
+thu7o7ng2	thường
+giu7o7ng2	giường
+#
+# Multi-word input: whitespace ends a word, and `auto_restore` acts before the space.
+Vie6t5 Nam	Việt Nam
+Ha2 No6i5	Hà Nội
+thanh2 pho61	thành phố
+cam3 o7n	cảm ơn
+xin chao2	xin chào
+tam5 bie6t5	tạm biệt
+buo6i3 sang1	buổi sáng
+hoc5 sinh	học sinh
+#
+# Telex keys are ordinary letters in VNI, and a digit that nothing claims stays visible.
+uow	uow
+thuong	thuong
+hello	hello
+1	1
+1a	1a
+12	12
+n6	n6
+b8	b8
+k9	k9
+[	[
+]	]
+s	s
+#
+# `auto_restore` also covers VNI: the raw keys come back with their digits.
+asd	asd
+ban1x	ban1x
+a1b2	a1b2
+a60	a60
+a67	a67

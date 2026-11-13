@@ -46,10 +46,10 @@ Each task ends with something you can type into and observe via `viet-cli`.
 
 **Checkpoint C:** `telex-new.tsv` and the old-style files (`telex-tone-old.tsv`, `telex-case-old.tsv`) green; every rule in spec §3.4 has 3 cases plus a counter-example; case invariance and precomposed output hold over the whole corpus. The 2,000-case target still waits on Q2.
 
-- [ ] **T1.7 VNI method**
+- [x] **T1.7 VNI method**
 - [ ] **T1.8 SimpleTelex method**
 
-**Checkpoint D:** all four corpus files green; ≥ 2,000 cases; no method-specific logic leaked into `tone.rs`.
+**Checkpoint D:** all four corpus files green (`telex-*`, `vni-*`); ≥ 2,000 cases still waits on Q2 (579 today); no method-specific logic leaked into `tone.rs`.
 
 ### Phase 2 — Robustness
 

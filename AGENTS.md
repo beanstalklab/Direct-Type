@@ -76,7 +76,7 @@ When SOLID conflicts with clarity, prefer clarity and say why in the change.
 
 ## Verification
 
-Current phase: **T1.7 (VNI method)**. The commands below are the only accepted
+Current phase: **T1.8 (Simple Telex method)**. The commands below are the only accepted
 verification; run them from the repository root. Do not substitute different
 commands, and do not lower a check to get to green.
 
@@ -117,15 +117,25 @@ commands, and do not lower a check to get to green.
   case cases across `telex-case.tsv` and `telex-case-old.tsv`), 71 core tests, 4 CLI
   integration tests, including case invariance for every corpus case and the
   precomposed-output (NFC) check.
-- Next: T1.7 — VNI (digits `1..5` tones, `0` removes, `6..9` letter modifiers). The
-  shared buffer and the spelling/restore switches stay method-neutral; only the rule
-  pack is new.
+- **T1.7 done**: VNI works from its own rule pack (`src/vni.rs`) on the shared fold
+  (`src/input.rs`, `RulePack` trait): `1..5` tones, `0` removes a tone, `6/7/8/9` add
+  the circumflex, horn, breve and stroke, `uo7` horns both letters while the word goes
+  on. `0` drops the tone digit (`a10 → a`) while doubling keeps one (`a11 → a1`). Keys
+  do not leak between methods (`w`, `[`, `]`, `s`, `z` are letters in VNI). 579 corpus
+  cases (204 VNI new + 17 VNI old), 80 core tests, 4 CLI integration tests, and
+  `tone.rs` is unchanged since Checkpoint C.
+- While writing the VNI `7` rule, T1.2's eager `uow → ươ` turned out to make `thuở`,
+  `quơ` and `huơ` untypable. Fixed in its own commit (`f89b2f2`): a word that ends at
+  the horn key keeps `uơ`, a word that goes on horns the pair (`uowng → ương`).
+- Next: T1.8 — Simple Telex, the restricted rule set (`aa/ee/oo`, `w`, `dd` only, no
+  tone keys of its own beyond Telex's). The seam is a third `RulePack` implementation.
 - `test` → `tét` stays `tét`: `tét` is real Vietnamese (`nét`, `mét`, `sét` share its
   rhyme), so no spelling rule may rewrite it. English typing needs the toggle key, or
   `free_tone_mark` off. Do not "fix" this by weakening the tables; the corpus case
   `telex-restore.tsv test → tét` exists to stop that.
-- Not implemented, by design: VNI (T1.7) and Simple Telex's restricted rule set (T1.8).
-  Both methods currently pass letters through unchanged.
+- Not implemented, by design: Simple Telex's restricted rule set (T1.8). It currently
+  passes letters through unchanged rather than being transformed by the full Telex
+  pack.
 - C ABI names follow the AGENTS.md naming rules (no abbreviations): `code_point`,
   `commit_length`, `preedit_length`, `reserved_flags`, `configuration`, `engine`.
 - Product name: **`directtype`**; the public repository is

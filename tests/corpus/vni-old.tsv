@@ -1,0 +1,22 @@
+# VNI with old tone placement, spec §3.4 rule 4. Only `oa / oe / uy` in an open
+# syllable differ between the styles; the two counter-examples at the end keep their
+# first vowel under both, which is what makes the style a local rule and not a switch.
+hoa1	hoá
+hoa2	hoà
+hoa3	hoả
+hoa4	hoã
+hoa5	hoạ
+Hoa2	Hoà
+HOA2	HOÀ
+khoe3	khoẻ
+thuy2	thuỳ
+thuy3	thuỷ
+thuy5	thuỵ
+Thuy3	Thuỷ
+THUY3	THUỶ
+#
+# Counter-examples: every other open pair keeps the first vowel.
+cai1	cái
+cua3	của
+mau1	máu
+coi2	còi

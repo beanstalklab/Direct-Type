@@ -351,11 +351,32 @@ cargo run -p viet-cli -- check tests/corpus
 **Description:** VNI key mapping from spec §3.2 (`1..5`, `0`, `6`, `7`, `8`, `9`) on the shared syllable/tone core. `tone.rs` must not gain VNI-specific branches.
 
 **Acceptance criteria:**
-- [ ] `viet65t` → `việt`-equivalent VNI case set passes
-- [ ] `d9 → đ`, `a8 → ă`, `o7 → ơ`, `u7 → ư`, `a6/e6/o6 → â/ê/ô`
-- [ ] `0` removes tone; doubled modifier key undoes
-- [ ] `vni-new.tsv` ≥ 200 cases
-- [ ] Diff of `tone.rs` against Checkpoint C is empty
+- [x] `vie65t` → `việt`-equivalent VNI case set passes (the task text said `viet65t`;
+      `6` after `t` marks nothing, so the working word is `vie65t` or `vie6t5`)
+- [x] `d9 → đ`, `a8 → ă`, `o7 → ơ`, `u7 → ư`, `a6/e6/o6 → â/ê/ô`
+- [x] `0` removes tone; doubled modifier key undoes
+- [x] `vni-new.tsv` ≥ 200 cases (204, plus 17 in `vni-old.tsv`)
+- [x] Diff of `tone.rs` against Checkpoint C is empty
+
+**Decisions recorded in this task:**
+
+- The fold moved to `input.rs` behind a `RulePack` trait (`refactor(core)` commit), so
+  VNI is a rule pack and not a second copy of the tone state machine. `tone.rs` and
+  `syllable.rs` are untouched, which is what the last criterion asks for.
+- VNI key table from `fcitx5-bamboo`'s `input_method_def.go` (MIT): `0` XoaDauThanh,
+  `6` `AEO_ÂÊÔ`, `7` `UO_ƯƠ`, `8` `A_Ă`, `9` `D_Đ`. A digit that cannot act stays
+  visible (`n6`, `a67`), because a keystroke that disappears is worse than one on
+  screen.
+- `0` removes the tone and drops the tone digit (`a10 → a`), unlike Telex's `asz → as`.
+  A tone letter is plausible text to leave behind; a digit is noise. Doubling keeps one
+  digit (`a11 → a1`) because the user typed it again. The `RulePack` trait carries this
+  as one associated constant rather than a branch in the fold.
+- Writing the VNI `7` rule exposed a defect in T1.2's Telex rule: an eager `uow → ươ`
+  made `thuở`, `quơ` and `huơ` untypable. Fixed first, as its own commit
+  (`fix(core): a word ending at w keeps the uơ rhyme`), with `fcitx5-bamboo`'s
+  `regUOhTail` lookahead as the source.
+- VNI and Telex keys do not leak: `w`, `[`, `]`, `s`, `z` are ordinary letters in VNI,
+  and `1`–`9` are ordinary characters in Telex. Corpus cases pin both directions.
 
 **Verification:**
 ```bash
@@ -365,7 +386,8 @@ git diff main -- crates/viet-core/src/tone.rs
 ```
 
 **Dependencies:** T1.5, T1.6
-**Files:** `crates/viet-core/src/vni.rs`, `crates/viet-core/src/input.rs`, `tests/corpus/vni-new.tsv`
+**Files:** `crates/viet-core/src/input.rs`, `crates/viet-core/src/vni.rs`,
+`crates/viet-core/src/lib.rs`, `tests/corpus/vni-new.tsv`, `tests/corpus/vni-old.tsv`
 **Scope:** M
 
 ---
