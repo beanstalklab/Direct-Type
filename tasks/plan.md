@@ -42,9 +42,9 @@ Each task ends with something you can type into and observe via `viet-cli`.
 
 - [x] **T1.4 Telex tone keys, tone removal, free tone mark**
 - [x] **T1.5 Auto-restore and spell-check**
-- [ ] **T1.6 Case handling (lower/UPPER/Title/mixed)**
+- [x] **T1.6 Case handling (lower/UPPER/Title/mixed)**
 
-**Checkpoint C:** `telex-new.tsv` and `telex-old.tsv` green; every rule in spec §3.4 has 3 cases plus a counter-example.
+**Checkpoint C:** `telex-new.tsv` and the old-style files (`telex-tone-old.tsv`, `telex-case-old.tsv`) green; every rule in spec §3.4 has 3 cases plus a counter-example; case invariance and precomposed output hold over the whole corpus. The 2,000-case target still waits on Q2.
 
 - [ ] **T1.7 VNI method**
 - [ ] **T1.8 SimpleTelex method**

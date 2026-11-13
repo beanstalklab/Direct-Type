@@ -438,7 +438,15 @@ mod tests {
 
     #[test]
     fn doubling_a_tone_key_removes_the_tone_and_keeps_the_letter() {
-        let cases = [("ass", "as"), ("aass", "âs"), ("toanss", "toans")];
+        let cases = [
+            ("ass", "as"),
+            ("aass", "âs"),
+            ("toanss", "toans"),
+            // Shift is not a different key: the second press undoes the mark, and the
+            // letter that comes back is the one the pending tone was typed with.
+            ("ASs", "AS"),
+            ("AsS", "As"),
+        ];
         for (raw, expected) in cases {
             assert_eq!(typed_text(&mut engine(), raw), expected, "raw {raw:?}");
         }
@@ -748,6 +756,26 @@ mod tests {
             (0..length)
                 .map(|_| Self::ALPHABET[self.next_number() as usize % Self::ALPHABET.len()])
                 .collect()
+        }
+    }
+
+    #[test]
+    fn output_never_contains_a_combining_mark() {
+        // Every character the engine inserts comes from the closed table in
+        // `unicode.rs`, which is precomposed, so a word typed without combining marks
+        // has to come out precomposed — the NFC guarantee in spec §2.1, checked here
+        // without a Unicode dependency.
+        let mut keys = Keys(0xfeed);
+        for _ in 0..500 {
+            let word = keys.next_word();
+            let text = finished_text_with(false, false, &word);
+            for character in text.chars() {
+                assert!(
+                    !('\u{0300}'..='\u{036F}').contains(&character),
+                    "{word:?} produced the combining mark U+{:04X}",
+                    u32::from(character)
+                );
+            }
         }
     }
 

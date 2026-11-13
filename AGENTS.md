@@ -76,7 +76,7 @@ When SOLID conflicts with clarity, prefer clarity and say why in the change.
 
 ## Verification
 
-Current phase: **T1.6 (case handling)**. The commands below are the only accepted
+Current phase: **T1.7 (VNI method)**. The commands below are the only accepted
 verification; run them from the repository root. Do not substitute different
 commands, and do not lower a check to get to green.
 
@@ -108,15 +108,24 @@ commands, and do not lower a check to get to green.
   because a wrongly rejected word loses the user's diacritics. 247 corpus cases
   (152 tone + 22 old-style + 17 restore), 68 core tests, including a property test
   that a restore never loses or reorders a keystroke.
-- Next: T1.6 — the case matrix (`VIEEJT → VIỆT`, `Vieejt → Việt`, `vIeejt → vIệt`).
-  Case already follows the letter that carries a mark; what T1.6 owes is the
-  mixed-case guarantee and its corpus coverage.
+- **T1.6 done**: case is per letter (§3.7). A letter keeps the case of the key that
+  produced it, a modifier or tone key never sets a vowel's case (`vIeejt → vIệt`), an
+  undo keeps the case already on screen (`Ww → W`, `AaA → AA`), and shift is not a
+  different key (`ASs → AS`). Two bugs came out of the new corpus-level property:
+  tone-key doubling compared characters case-sensitively, and the `w` undo replaced the
+  inserted `ư` with the current key, flipping the capital. 353 corpus cases (106 new
+  case cases across `telex-case.tsv` and `telex-case-old.tsv`), 71 core tests, 4 CLI
+  integration tests, including case invariance for every corpus case and the
+  precomposed-output (NFC) check.
+- Next: T1.7 — VNI (digits `1..5` tones, `0` removes, `6..9` letter modifiers). The
+  shared buffer and the spelling/restore switches stay method-neutral; only the rule
+  pack is new.
 - `test` → `tét` stays `tét`: `tét` is real Vietnamese (`nét`, `mét`, `sét` share its
   rhyme), so no spelling rule may rewrite it. English typing needs the toggle key, or
   `free_tone_mark` off. Do not "fix" this by weakening the tables; the corpus case
   `telex-restore.tsv test → tét` exists to stop that.
-- Not implemented, by design: case matrix (T1.6), VNI (T1.7), Simple Telex's restricted
-  rule set (T1.8). Those methods currently pass letters through unchanged.
+- Not implemented, by design: VNI (T1.7) and Simple Telex's restricted rule set (T1.8).
+  Both methods currently pass letters through unchanged.
 - C ABI names follow the AGENTS.md naming rules (no abbreviations): `code_point`,
   `commit_length`, `preedit_length`, `reserved_flags`, `configuration`, `engine`.
 - Product name: **`directtype`**; the public repository is

@@ -43,8 +43,11 @@ pub struct Report {
     pub failures: Vec<Failure>,
 }
 
-/// Run every `.tsv` file in `directory`, in name order so results are stable.
-pub fn run(directory: &Path) -> Result<Report, String> {
+/// Every `.tsv` file in `directory`, in name order so results are stable.
+///
+/// Public because a test that checks a property of the whole corpus (case
+/// invariance) needs the same file list the runner uses, not its own copy.
+pub fn case_files(directory: &Path) -> Result<Vec<PathBuf>, String> {
     let entries = fs::read_dir(directory)
         .map_err(|error| format!("cannot read {}: {error}", directory.display()))?;
 
@@ -53,9 +56,13 @@ pub fn run(directory: &Path) -> Result<Report, String> {
         .filter(|path| path.extension().and_then(|extension| extension.to_str()) == Some("tsv"))
         .collect();
     files.sort();
+    Ok(files)
+}
 
+/// Run every `.tsv` file in `directory`, in name order so results are stable.
+pub fn run(directory: &Path) -> Result<Report, String> {
     let mut report = Report::default();
-    for file in files {
+    for file in case_files(directory)? {
         let configuration = configuration_from_filename(&file)?;
         for case in read_cases(&file)? {
             report.total += 1;
@@ -103,7 +110,8 @@ fn apply(committed: &mut String, action: Action<'_>) {
     committed.push_str(action.commit);
 }
 
-fn read_cases(path: &Path) -> Result<Vec<Case>, String> {
+/// Every case of one corpus file, in file order.
+pub fn read_cases(path: &Path) -> Result<Vec<Case>, String> {
     let contents = fs::read_to_string(path)
         .map_err(|error| format!("cannot read {}: {error}", path.display()))?;
 
@@ -139,7 +147,8 @@ fn read_cases(path: &Path) -> Result<Vec<Case>, String> {
     Ok(cases)
 }
 
-fn configuration_from_filename(path: &Path) -> Result<Config, String> {
+/// The configuration a corpus file name selects: method and tone style.
+pub fn configuration_from_filename(path: &Path) -> Result<Config, String> {
     let stem = path
         .file_stem()
         .and_then(|stem| stem.to_str())

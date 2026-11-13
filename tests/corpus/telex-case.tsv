@@ -1,0 +1,123 @@
+# Case handling, spec §3.7. The engine never folds case: every letter keeps the case
+# of the key that produced it, a modifier changes no case at all, and a doubling undo
+# puts back the letter as it was typed. `auto_restore` returns the raw keys, so a
+# restored word keeps its case by construction.
+#
+# A tone key marks a letter; it does not set its case. `aS` and `AS` mark the same `a`
+# and differ only in the vowel's case.
+as	á
+As	Á
+aS	á
+AS	Á
+af	à
+AF	À
+ar	ả
+AR	Ả
+ax	ã
+AX	Ã
+aj	ạ
+AJ	Ạ
+#
+# A letter modifier marks the letter in front of it, so the first letter of the pair
+# decides: `Aa` and `aA` both mark the first `a`.
+aa	â
+Aa	Â
+aA	â
+AA	Â
+ee	ê
+Ee	Ê
+eE	ê
+EE	Ê
+oo	ô
+Oo	Ô
+oO	ô
+OO	Ô
+aw	ă
+Aw	Ă
+aW	ă
+AW	Ă
+ow	ơ
+Ow	Ơ
+oW	ơ
+uw	ư
+Uw	Ư
+uW	ư
+#
+# `w`, `[` and `]` produce a letter of their own, so their key case is the letter's
+# case where the key has one.
+w	ư
+W	Ư
+[	ơ
+]	ư
+#
+# The struck `d` keeps the case of the `d` it marks.
+dd	đ
+Dd	Đ
+dD	đ
+DD	Đ
+ddi	đi
+Ddi	Đi
+DDI	ĐI
+#
+# Doubling undoes the modifier and keeps the case of the letter on screen; where the
+# undo leaves a key behind, that key is the one that undid the mark (`aww → aw`) or the
+# one it replaced when nothing was marked (`ww → w`).
+aaa	aa
+AaA	AA
+aaA	aA
+ddd	dd
+DdD	DD
+ddD	dD
+ww	w
+Ww	W
+wW	w
+WW	W
+#
+# Doubling a tone key and `z` give the tone key's letter back, in the case it was
+# typed: the same key with shift held is still the same key.
+ass	as
+ASs	AS
+AsS	As
+asz	as
+ASZ	AS
+AsZ	As
+toanss	toans
+TOANSZ	TOANS
+#
+# Words in the four cases a user types: lower, Title, upper, and a capital somewhere
+# inside. The capital stays on the letter it was typed on.
+vieejt	việt
+Vieejt	Việt
+VIEEJT	VIỆT
+vIeejt	vIệt
+vieeJt	việt
+dduowngf	đường
+Dduowng	Đương
+DDUOWNG	ĐƯƠNG
+DdUowng	ĐƯơng
+tieengs	tiếng
+Tieengs	Tiếng
+TIEENGS	TIẾNG
+nguyeenx	nguyễn
+Nguyeenx	Nguyễn
+NGUYEENX	NGUYỄN
+quyeenf	quyền
+Quyeenf	Quyền
+QUYEENF	QUYỀN
+cais	cái
+Cais	Cái
+CAIS	CÁI
+cAis	cÁi
+cuar	của
+Cuar	Của
+CUAR	CỦA
+toaNs	toáN
+ToaNs	ToáN
+#
+# `auto_restore` gives the raw keys back, case included.
+asd	asd
+Asd	Asd
+ASD	ASD
+aass	aass
+Aass	Aass
+AASS	AASS

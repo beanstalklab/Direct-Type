@@ -17,12 +17,13 @@ Pre-alpha. What exists today:
   modifier rewrites what the application already shows (`aa` → `â`) without a
   composition buffer. Telex letters and tone keys work, including old/new tone
   placement and `free_tone_mark`; `auto_restore` and `spell_check` work on a closed
-  onset/nucleus/coda spelling test. VNI and Simple Telex's restricted rule set are
-  **not implemented yet**.
+  onset/nucleus/coda spelling test; case is per letter, so `VIEEJT`, `Vieejt` and
+  `vIeejt` come out as `VIỆT`, `Việt` and `vIệt`. VNI and Simple Telex's restricted rule
+  set are **not implemented yet**.
 - `crates/viet-cli` — `viet-cli type` and `viet-cli check` (golden-corpus runner,
   exit codes `0`/`1`/`2`).
 - `crates/viet-ffi` — a C ABI over the engine, with panics contained at the boundary.
-- 247 corpus cases and CI that runs formatting, lint, tests and the corpus.
+- 353 corpus cases and CI that runs formatting, lint, tests and the corpus.
 
 There is no fcitx5 addon, no installer, and nothing to install yet.
 

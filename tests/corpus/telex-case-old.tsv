@@ -1,0 +1,13 @@
+# Case handling with old tone placement, spec §3.7. Only `oa / oe / uy` in an open
+# syllable differ between the styles, so this file pins the cases where the style and
+# the letter's case meet. See `telex-case.tsv` for the rule itself.
+hoaf	hoà
+Hoaf	Hoà
+HOAF	HOÀ
+hOaf	hOà
+thuyr	thuỷ
+Thuyr	Thuỷ
+THUYR	THUỶ
+khoer	khoẻ
+Khoer	Khoẻ
+KHOER	KHOẺ

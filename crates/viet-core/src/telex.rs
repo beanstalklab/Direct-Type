@@ -95,7 +95,8 @@ fn fold(raw_keystrokes: &str, config: &Config, tone_keys_act: bool, output: &mut
 /// Handle one tone key. Returns whether it acted as a modifier.
 ///
 /// A tone key is a letter until it is inside a syllable (`sz` keeps its `s`), and
-/// doubling undoes it instead of applying a second tone (`ass → as`).
+/// doubling undoes it instead of applying a second tone (`ass → as`). Shift is not a
+/// different key, so `ASs` undoes like `ass`.
 fn apply_tone_key(
     output: &mut String,
     key: char,
@@ -106,7 +107,7 @@ fn apply_tone_key(
         if parse(output.as_str()).is_none() {
             return false;
         }
-        if *previous_tone_key == Some(key) {
+        if previous_tone_key.is_some_and(|previous| previous.eq_ignore_ascii_case(&key)) {
             restore_tone_key_letter(output, pending_tone);
             *previous_tone_key = None;
             return true;
@@ -267,11 +268,15 @@ fn append_stroke(output: &mut String, key: char, origin: Origin) -> Origin {
 
 /// `w → ư`, `aw → ă`, `uw → ư`, `ow → ơ`, and `uow → ươ`.
 fn append_w(output: &mut String, key: char, origin: Origin) -> Origin {
-    // `ww → w`: a second `w` cancels the letter the first one produced.
-    if origin == Origin::ModifierKey('w') || origin == Origin::ModifierKey('W') {
-        output.pop();
-        output.push(key);
-        return Origin::Literal;
+    // `ww → w`: a second `w` cancels the letter the first one produced. The letter
+    // that stays is the one already on screen, case included, because an undo must not
+    // also change what the user sees (`Ww → W`, not `w`).
+    if let Origin::ModifierKey(produced) = origin {
+        if produced.eq_ignore_ascii_case(&'w') {
+            output.pop();
+            output.push(produced);
+            return Origin::Literal;
+        }
     }
 
     let Some(previous) = output.chars().next_back() else {
@@ -452,6 +457,26 @@ mod tests {
     }
 
     #[test]
+    fn doubling_keeps_the_case_of_the_letter_on_screen() {
+        // The undo removes the mark, not the case: `Ư` becomes `W`, so the letter on
+        // screen never flips case while the user is removing a diacritic. The key that
+        // comes back is the one the first press typed, not the one that undid it.
+        let cases = [
+            ("Ww", "W"),
+            ("wW", "w"),
+            ("WW", "W"),
+            // A `w` that marked a letter leaves the letter and the current key, so the
+            // key that comes back there is the one that undid the mark.
+            ("AwW", "AW"),
+            ("AWw", "Aw"),
+            ("aWW", "aW"),
+        ];
+        for (raw, expected) in cases {
+            assert_eq!(transform(raw), expected, "raw {raw:?}");
+        }
+    }
+
+    #[test]
     fn horn_covers_both_letters_of_the_uo_pair() {
         assert_eq!(transform("uow"), "ươ");
         assert_eq!(transform("uwow"), "ươ");
@@ -502,6 +527,17 @@ mod tests {
     fn a_tone_that_cannot_be_placed_keeps_every_keystroke() {
         // `ashello` is not one syllable, so `s` was a letter and must not vanish.
         assert_eq!(transform("ashello"), "ashello");
+    }
+
+    #[test]
+    fn doubling_a_tone_key_ignores_the_letter_case() {
+        // Shift is not a different key: the user pressed the same key twice, so the
+        // mark has to come off. The letter put back at the position is the one the
+        // pending tone was typed with, so `ASs` gives `AS` and `AsS` gives `As`.
+        let cases = [("ASs", "AS"), ("AsS", "As"), ("asFf", "aF"), ("aSfF", "af")];
+        for (raw, expected) in cases {
+            assert_eq!(transform(raw), expected, "raw {raw:?}");
+        }
     }
 
     #[test]

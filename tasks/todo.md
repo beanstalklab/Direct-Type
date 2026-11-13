@@ -294,10 +294,35 @@ cargo test --workspace
 **Description:** Correct case for lowercase, UPPERCASE, Title and mixed input, including Vietnamese diacritics (`Đ`, `Ư`, `Ế`).
 
 **Acceptance criteria:**
-- [ ] `VIEEJT → VIỆT`, `Vieejt → Việt`, `vIeejt → vIệt` (preserve position of capitals)
-- [ ] `DD → Đ`, `dd → đ`
-- [ ] No output contains a combining mark (NFC assertion over the whole corpus)
-- [ ] Every corpus case also has a Title-case twin where meaningful
+- [x] `VIEEJT → VIỆT`, `Vieejt → Việt`, `vIeejt → vIệt` (preserve position of capitals)
+- [x] `DD → Đ`, `dd → đ`
+- [x] No output contains a combining mark (NFC assertion over the whole corpus)
+- [x] Every corpus case also has a Title-case twin where meaningful
+
+**Decisions recorded in this task:**
+
+- The "Title-case twin" criterion is a generated property, not a second copy of every
+  file: `crates/viet-cli/tests/corpus.rs` derives the upper-case and the Title-case twin
+  of every case in `tests/corpus`, requires the output to be the twin of the
+  expectation, and asserts that at least 100 twins were checked so the property cannot
+  pass vacuously. A case added later is covered without editing another file.
+- That property found two real bugs, both from treating shift as a different key.
+  Doubling a tone key compared characters case-sensitively, so `ASs` re-applied the
+  acute instead of undoing it (now `ASs → AS`). And undoing the inserted `ư` of `w`
+  replaced it with the *current* key, so `Ww` flipped the capital to lowercase on
+  screen (now `Ww → W` — an undo keeps the case of the letter already there).
+- The NFC criterion is checked as "no output character is a combining mark
+  (U+0300–U+036F)", which is exactly what a decomposed Vietnamese letter is made of, so
+  it needs no Unicode dependency. It runs over the whole corpus and over 500 generated
+  words in `viet-core`.
+- No `unicode.rs` change was needed: the table already lists uppercase rows explicitly
+  and has no case-folded fallback, so case was a rule question, not a table question.
+  `crates/viet-core/tests/corpus.rs` from the task text does not exist; the corpus
+  integration test belongs to the crate that owns the runner, so it lives in
+  `crates/viet-cli/tests/corpus.rs`.
+- `viet-cli::corpus` gained `case_files`, `read_cases` and `configuration_from_filename`
+  as public functions, so the integration test reads the corpus with the runner's own
+  parser instead of a copy of it.
 
 **Verification:**
 ```bash
@@ -306,12 +331,15 @@ cargo run -p viet-cli -- check tests/corpus
 ```
 
 **Dependencies:** T1.4
-**Files:** `crates/viet-core/src/unicode.rs`, `crates/viet-core/tests/corpus.rs`, `tests/corpus/telex-case.tsv`
+**Files:** `crates/viet-core/src/telex.rs`, `crates/viet-core/src/lib.rs`,
+`crates/viet-cli/src/corpus.rs`, `crates/viet-cli/tests/corpus.rs`,
+`tests/corpus/telex-case.tsv`, `tests/corpus/telex-case-old.tsv`
 **Scope:** S
 
 ### Checkpoint C
-- [ ] `telex-new.tsv` and `telex-old.tsv` green
-- [ ] Every spec §3.4 rule has ≥ 3 cases plus a counter-example
+- [x] `telex-new.tsv` green, and the old-style files (`telex-tone-old.tsv`,
+      `telex-case-old.tsv`) green with old placement
+- [x] Every spec §3.4 rule has ≥ 3 cases plus a counter-example
 - [ ] Human review before VNI
 
 ---

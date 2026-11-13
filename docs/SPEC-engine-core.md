@@ -137,20 +137,20 @@ Tone keys in Telex, in the detail T1.4 pinned down:
   it moves when the word grows: `toasn → toán` (the mark typed on `toa` ends up on
   `a` after `n` arrives).
 - Doubling a tone key undoes it and keeps the letter: `ass → as`, `aass → âs`,
-  `toanss → toans`.
+  `toanss → toans`. Shift is not a different key, so `ASs → AS` (§3.7).
 - `z` removes the tone and puts the tone key's letter back where it was typed, which
   is the same rule as doubling seen from the other side: `asz → as`, `asdz → asd`,
   `toansz → toans`. With no tone to remove, `z` is a letter (`az → az`).
 
 Letter modifiers in Telex, in the detail T1.2 pinned down:
 
-- Doubling undoes the modifier and keeps the key literal: `aaa → aa`, `ddd → dd`, `ww → w`, `uoww → uow`.
+- Doubling undoes the modifier and keeps the key literal: `aaa → aa`, `ddd → dd`, `ww → w`, `uoww → uow`. The letter that survives keeps the case already on screen (§3.7).
 - `w` after `o` horns both letters of the `uo` pair, because one keystroke has to reach `ươ`: `uow → ươ`, `uwow → ươ`.
 - `[` and `]` insert `ơ` and `ư` themselves; they are listed as letters above, not as a modification of a preceding letter (`a[` is `aơ`, not `ă`).
   With `auto_restore` on — the default — a word that only reaches an invalid
   spelling this way is given back at the boundary (`a[` → `a[`), which is §3.5.
 - A letter that already carries a different mark keeps it and the key stays literal: `awa → ăa`, `oow → ôw`.
-- Case follows the letter that carries the mark, which is the first of the pair: `AA → Â`, `aA → â`, `VIEE → VIÊ`.
+- Case follows the letter that carries the mark, which is the first of the pair: `AA → Â`, `aA → â`, `VIEE → VIÊ`. §3.7 has the whole rule, including what an undo does to case.
 
 ### 3.3 Syllable model
 
@@ -281,6 +281,42 @@ The `viet-core` unit tests cover the tables with real words (`nghiêng`, `khuỷ
 `rượu`, `nguyễn`) and dead ends (`tes`, `hello`, `awa`), so a table edit that starts
 rejecting Vietnamese fails immediately.
 
+### 3.7 Case
+
+The engine never folds case. Four rules produce every mixed-case word:
+
+1. A letter keeps the case of the key that produced it. A modifier marks the letter in
+   front of it and does not set that letter's case, so the first letter of the pair
+   decides: `Aa → Â` and `aA → â`, `AW → Ă`, `Dd → Đ`, `DD → Đ`, `dD → đ`.
+2. A tone key does not set the case of the vowel it marks: `aS` and `AS` both mark a
+   lowercase `a` and differ only in the tone key's case, so they are `á` and `Á`. That
+   is what keeps a capital where the user typed it inside a word: `Vieejt → Việt`,
+   `vIeejt → vIệt`, `VIEEJT → VIỆT`, `vieeJt → việt`.
+3. An undo keeps the case of the letter already on screen, so removing a diacritic
+   never flips what the user is looking at: `Ư` becomes `W` (`Ww → W`), `Â` becomes `AA`
+   (`AaA → AA`). Where the undo leaves a key behind it is the key that undid the mark
+   (`aww → aw`, so `AWw → Aw`) or, when the first key only inserted a letter, the key of
+   that first press (`Ww → W`, `wW → w`).
+4. Shift is not a different key. Doubling ignores case (`ASs → AS`, `AsS → As`), `z`
+   removes the tone in either case (`ASZ → AS`), and the letter put back at the tone
+   key's position keeps the case it was typed with.
+
+`auto_restore` returns the raw keys, so a restored word keeps its case by construction
+(`Asd → Asd`, `ASD → ASD`).
+
+Two of the guarantees are corpus-level properties, not case lists:
+
+- **Case invariance.** Upper-casing the input upper-cases the output, and Title-casing
+  the input Title-cases the output. `crates/viet-cli/tests/corpus.rs` derives both twins
+  from every case in `tests/corpus`, so a case added later is covered the moment it
+  lands and no file needs a hand-written second copy that could drift.
+- **Precomposed output.** No output contains a combining mark (U+0300–U+036F). Every
+  character the engine inserts comes from the closed table in `unicode.rs`, so a word
+  typed without combining marks comes out in NFC. `unicode.rs` has no case-folded
+  fallback and no case table of its own: uppercase Vietnamese letters are listed
+  explicitly, which is why a missing capital is a visible hole rather than a silent
+  behaviour difference.
+
 ## 4. Commands
 
 Run from the repository root. `cargo` is user-local on this host, so source
@@ -322,6 +358,8 @@ tests/corpus/telex-letters.tsv   letter modifiers
 tests/corpus/telex-tone.tsv      tone keys, new tone style
 tests/corpus/telex-tone-old.tsv  tone keys, old tone style
 tests/corpus/telex-restore.tsv   auto_restore: invalid words, undone modifiers, limits
+tests/corpus/telex-case.tsv      case handling: lower, Title, upper, mixed
+tests/corpus/telex-case-old.tsv  case handling with old tone placement
 tests/corpus/simple-telex-new.tsv  planned, T1.8
 tests/corpus/vni-new.tsv           planned, T1.7
 scripts/corpus_tool.py          planned; Python 3.14 stdlib only: sort, dedupe, validate TSV
@@ -384,6 +422,11 @@ Conventions: `snake_case`, `CamelCase` types, no `unwrap`/`expect`/`panic!` outs
 | Property | `tests/invariants.rs` | no panic on arbitrary char streams; `reset` is total; output is always NFC |
 | Fuzz | `fuzz/` | crash/hang resistance, run manually before releases |
 | Bench | `benches/` | p99 keystroke latency < 1 ms (target: < 10 µs) |
+
+Case is a property too: `crates/viet-cli/tests/corpus.rs` derives the upper-case and
+Title-case twin of every corpus case and requires the output to be the twin of the
+expectation, and asserts that no output contains a combining mark (the NFC guarantee of
+§2.1). Both checks cover cases added later without a second copy of any file.
 
 Restore is a property, not a case list: `viet_core::tests::a_restore_never_loses_or_reorders_a_keystroke`
 types 2,000 generated words twice — once with `auto_restore`, once without — and
