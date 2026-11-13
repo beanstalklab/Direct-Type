@@ -76,28 +76,30 @@ When SOLID conflicts with clarity, prefer clarity and say why in the change.
 
 ## Verification
 
-Current phase: **T0.2 (toolchain bootstrap)**. These commands are defined by
-`docs/SPEC-engine-core.md` §4 and `tasks/todo.md`, but **are not runnable until
-T0.2 and T0.3 complete** (this host has no Rust toolchain yet). Do not substitute
-different commands; if one fails because the toolchain is absent, report that
-instead of improvising.
+Current phase: **T1.3 (syllable parser and tone index)**. The commands below are the
+only accepted verification; run them from the repository root. Do not substitute
+different commands, and do not lower a check to get to green.
 
-### Current state (2026-11-12)
+### Current state (2026-11-13)
 
-- **Toolchain complete**: rustc/cargo 1.99.1 + clippy + rustfmt (user-local, `~/.cargo`),
+- **Toolchain**: rustc/cargo 1.99.1 + clippy + rustfmt (user-local, `~/.cargo`),
   cc 13.3.0, pkg-config 1.8.1, cmake 3.28.3, `Fcitx5Core` dev headers 5.1.7.
   rustup was installed with `--no-modify-path`: run `source "$HOME/.cargo/env"`
   before any cargo command (or add it to your shell profile).
-- **T0.3 verified**: `cargo build/test/clippy/fmt` all pass; `viet-cli` exits `2`
-  on usage as specified; FFI artifacts build as `target/debug/libviet.a` and
-  `libviet.so` (crate `viet-ffi`, `[lib] name = "viet"`).
 - **T1.1 done**: characters commit immediately (no preedit), `viet-cli type` and
-  `viet-cli check` work with exit codes `0/1/2`, 10 passthrough corpus cases pass,
-  and CI runs the corpus check. 7 core unit tests + 2 CLI tests green.
-- Next: T1.2 — blocked on the corpus source decision (`tasks/plan.md` Q2).
+  `viet-cli check` work with exit codes `0/1/2`, and CI runs the corpus check.
+- **T1.2 done**: Telex letter modifiers (`aa/ee/oo`, `w`, `aw/ow/uw`, `dd`, `[`, `]`,
+  `uow → ươ`) with doubling to undo; a modifier reports `backspaces` and rewrites
+  text the application already shows. 56 corpus cases, 23 tests, CI green.
+- Next: T1.3 — syllable parser and `tone_index`, no tone application yet.
+- Not implemented, by design: tone keys (T1.4), auto-restore and spell-check (T1.5),
+  case matrix (T1.6), VNI (T1.7), Simple Telex's restricted rule set (T1.8). Those
+  methods currently pass letters through unchanged.
 - C ABI names follow the AGENTS.md naming rules (no abbreviations): `code_point`,
   `commit_length`, `preedit_length`, `reserved_flags`, `configuration`, `engine`.
-- Product name: `directtype` proposed (language-neutral), awaiting confirmation before any public artifact.
+- Product name: **`directtype`**; the public repository is
+  `beanstalklab/Direct-Type`. The working directory is still named `unikey` and must
+  be renamed before anything is published under that path.
 
 
 ```bash

@@ -4,10 +4,16 @@
 //! should do. This crate must never depend on fcitx5, GTK, Qt, X11, Wayland, the
 //! filesystem, or the environment. See `docs/SPEC-engine-core.md`.
 //!
-//! Status after T1.1: characters are committed immediately and never held in a
-//! preedit buffer. Telex/VNI transformation arrives in T1.2 onwards.
+//! Status: Telex letter modifiers work (T1.2). Characters are committed
+//! immediately and never held in a preedit buffer, so a modifier rewrites what the
+//! application already shows instead of building a composition string. Tone keys
+//! (T1.4), VNI (T1.7) and Simple Telex's restricted modifier set (T1.8) are not
+//! implemented yet.
 
 #![forbid(unsafe_code)]
+
+mod telex;
+mod unicode;
 
 /// Input method used to interpret keystrokes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -100,11 +106,16 @@ impl Action<'static> {
 #[derive(Debug, Clone)]
 pub struct Engine {
     config: Config,
-    /// Keystrokes of the word currently being typed. Kept because backspace and
-    /// auto-restore both need to re-derive the word from its raw input (T1.5, T2.1).
+    /// Keystrokes of the word currently being typed, exactly as typed. The
+    /// transformation is re-derived from this on every key, which is what makes
+    /// backspace (T2.1) and auto-restore (T1.5) exact rather than incremental.
     raw_keys: String,
-    /// Reused output buffer, so the hot path does not allocate once warmed up.
-    commit_buffer: String,
+    /// Text the application currently shows for this word: the previous
+    /// transformation. Kept only to report the smallest delete-and-replace.
+    shown_text: String,
+    /// Reused buffer for the next transformation, so the hot path does not
+    /// allocate once warmed up.
+    scratch: String,
 }
 
 impl Engine {
@@ -112,37 +123,29 @@ impl Engine {
         Self {
             config,
             raw_keys: String::new(),
-            commit_buffer: String::new(),
+            shown_text: String::new(),
+            scratch: String::new(),
         }
     }
 
     /// Feed one key event and return what the frontend should perform.
     pub fn feed(&mut self, input: Input) -> Action<'_> {
-        self.commit_buffer.clear();
         match input {
             Input::Char(character) => {
                 self.raw_keys.push(character);
-                // Every character is consumed so a later language pack can rewrite
-                // it, and committed immediately so the application never sees a
-                // composition buffer that it would render underlined.
-                self.commit_buffer.push(character);
-                Action {
-                    consumed: true,
-                    backspaces: 0,
-                    commit: &self.commit_buffer,
-                    preedit: "",
-                    boundary: false,
-                }
+                self.rewrite()
             }
             Input::Backspace => {
-                self.raw_keys.pop();
-                // The application deletes the character itself; the engine only
-                // keeps its own copy in sync.
-                Action::none()
+                // Deleting a keystroke can change earlier characters, so the word is
+                // re-derived instead of only losing its last character.
+                if self.raw_keys.pop().is_none() {
+                    return Action::none();
+                }
+                self.rewrite()
             }
             Input::Boundary => {
                 let ended_word = !self.raw_keys.is_empty();
-                self.raw_keys.clear();
+                self.clear_word();
                 Action {
                     consumed: false,
                     backspaces: 0,
@@ -152,25 +155,94 @@ impl Engine {
                 }
             }
             Input::Reset => {
-                self.raw_keys.clear();
+                self.clear_word();
                 Action::none()
             }
         }
     }
 
+    /// Re-derive the word and report the smallest edit that reaches it.
+    fn rewrite(&mut self) -> Action<'_> {
+        self.transform_into_scratch();
+
+        let (shared_characters, shared_bytes) = shared_prefix(&self.shown_text, &self.scratch);
+        // Characters, not bytes: the ABI counts deletions in characters.
+        let backspaces = u16::try_from(self.shown_text.chars().count() - shared_characters)
+            // Unreachable for a real word; clamping keeps the 16-bit ABI field honest
+            // instead of wrapping to a small number that would corrupt the word.
+            .unwrap_or(u16::MAX);
+
+        // The freshly derived text becomes the shown one; the old text is recycled
+        // as the next scratch buffer.
+        core::mem::swap(&mut self.shown_text, &mut self.scratch);
+
+        Action {
+            // The key is never forwarded: the frontend deletes `backspaces`
+            // characters and inserts `commit`. That is what keeps a composition
+            // buffer out of the application, so nothing is rendered underlined.
+            consumed: true,
+            backspaces,
+            commit: &self.shown_text[shared_bytes..],
+            preedit: "",
+            boundary: false,
+        }
+    }
+
+    /// Put the transformation of the current word into `scratch`.
+    fn transform_into_scratch(&mut self) {
+        match self.config.method {
+            Method::Telex => telex::apply_letter_modifiers(&self.raw_keys, &mut self.scratch),
+            // Simple Telex has a narrower modifier set (T1.8) and VNI uses digit
+            // keys (T1.7). Until those land, their words reach the application
+            // unchanged rather than half-transformed by the wrong rule pack.
+            Method::SimpleTelex | Method::Vni => {
+                self.scratch.clear();
+                self.scratch.push_str(&self.raw_keys);
+            }
+        }
+    }
+
+    fn clear_word(&mut self) {
+        self.raw_keys.clear();
+        self.shown_text.clear();
+        self.scratch.clear();
+    }
+
     /// Drop all state, for example when focus or language changes.
     pub fn reset(&mut self) {
-        self.raw_keys.clear();
-        self.commit_buffer.clear();
+        self.clear_word();
     }
 
     pub const fn config(&self) -> &Config {
         &self.config
     }
 
+    /// Replace the configuration.
+    ///
+    /// The caller must [`reset`](Self::reset) when the input method changes: the
+    /// shown word was derived with the old rule pack, so continuing it would report
+    /// deltas against text the new pack would never produce.
     pub fn set_config(&mut self, config: Config) {
         self.config = config;
     }
+}
+
+/// Characters and byte length shared by the start of both texts.
+fn shared_prefix(left: &str, right: &str) -> (usize, usize) {
+    let mut characters = 0;
+    let mut bytes = 0;
+    let mut right_characters = right.chars();
+    for left_character in left.chars() {
+        let Some(right_character) = right_characters.next() else {
+            break;
+        };
+        if left_character != right_character {
+            break;
+        }
+        characters += 1;
+        bytes += left_character.len_utf8();
+    }
+    (characters, bytes)
 }
 
 #[cfg(test)]
@@ -181,11 +253,25 @@ mod tests {
         Engine::new(Config::default())
     }
 
+    /// Feed `keys` and return the text an application would show afterwards.
+    fn typed_text(engine: &mut Engine, keys: &str) -> String {
+        let mut text = String::new();
+        for character in keys.chars() {
+            let action = engine.feed(Input::Char(character));
+            for _ in 0..action.backspaces {
+                text.pop();
+            }
+            text.push_str(action.commit);
+        }
+        text
+    }
+
     #[test]
     fn character_is_committed_immediately() {
         let mut engine = engine();
         let action = engine.feed(Input::Char('a'));
         assert!(action.consumed);
+        assert_eq!(action.backspaces, 0);
         assert_eq!(action.commit, "a");
         assert_eq!(action.preedit, "");
         assert!(!action.boundary);
@@ -202,13 +288,39 @@ mod tests {
     }
 
     #[test]
-    fn boundary_reports_the_end_of_a_word() {
+    fn modifier_replaces_the_character_already_committed() {
         let mut engine = engine();
         engine.feed(Input::Char('a'));
+        let action = engine.feed(Input::Char('a'));
+        assert!(action.consumed);
+        assert_eq!(action.backspaces, 1);
+        assert_eq!(action.commit, "â");
+    }
+
+    #[test]
+    fn typed_words_match_telex() {
+        let cases = [
+            ("viee", "viê"),
+            ("ddaay", "đây"),
+            ("thuowng", "thương"),
+            ("aa", "â"),
+            ("aaa", "aa"),
+            ("dd", "đ"),
+        ];
+        for (raw, expected) in cases {
+            assert_eq!(typed_text(&mut engine(), raw), expected, "raw {raw:?}");
+        }
+    }
+
+    #[test]
+    fn boundary_ends_the_word_and_clears_the_transformation() {
+        let mut engine = engine();
+        assert_eq!(typed_text(&mut engine, "aa"), "â");
         let action = engine.feed(Input::Boundary);
         assert!(action.boundary);
         assert!(!action.consumed);
-        assert_eq!(action.commit, "");
+        // The next word starts from its own keystrokes, not from `â`.
+        assert_eq!(typed_text(&mut engine, "a"), "a");
     }
 
     #[test]
@@ -219,35 +331,68 @@ mod tests {
     }
 
     #[test]
+    fn backspace_rederives_the_word() {
+        let mut engine = engine();
+        assert_eq!(typed_text(&mut engine, "viee"), "viê");
+
+        let action = engine.feed(Input::Backspace);
+        assert!(action.consumed);
+        // `viê` minus the last keystroke is `vie`, so the mark has to go too.
+        assert_eq!(action.backspaces, 1);
+        assert_eq!(action.commit, "e");
+        assert!(!action.boundary);
+    }
+
+    #[test]
+    fn backspace_on_an_empty_word_is_forwarded() {
+        let mut engine = engine();
+        assert_eq!(engine.feed(Input::Backspace), Action::none());
+    }
+
+    #[test]
     fn reset_clears_the_word() {
         let mut engine = engine();
         engine.feed(Input::Char('a'));
         engine.reset();
         assert!(!engine.feed(Input::Boundary).boundary);
+        assert_eq!(typed_text(&mut engine, "a"), "a");
     }
 
     #[test]
-    fn backspace_keeps_the_raw_word_in_sync() {
-        let mut engine = engine();
-        engine.feed(Input::Char('a'));
-        engine.feed(Input::Backspace);
-        // The raw word is empty again, so this boundary has nothing to finish.
-        assert!(!engine.feed(Input::Boundary).boundary);
+    fn unimplemented_methods_pass_letters_through() {
+        // T1.8 will give Simple Telex its narrower rule set; until then the engine
+        // must not apply Telex rules under another method's name.
+        let mut engine = Engine::new(Config {
+            method: Method::SimpleTelex,
+            ..Config::default()
+        });
+        assert_eq!(typed_text(&mut engine, "aa"), "aa");
     }
 
     #[test]
-    fn commit_buffer_capacity_stabilizes() {
+    fn buffers_stabilize_after_warmup() {
         let mut engine = engine();
         for _ in 0..100 {
-            engine.feed(Input::Char('a'));
+            typed_text(&mut engine, "thuowng");
+            engine.reset();
         }
-        let warmed_up_capacity = engine.commit_buffer.capacity();
+        let warmed_up = (
+            engine.raw_keys.capacity(),
+            engine.shown_text.capacity(),
+            engine.scratch.capacity(),
+        );
+
         for _ in 0..1_000 {
-            engine.feed(Input::Char('a'));
+            typed_text(&mut engine, "thuowng");
+            engine.reset();
         }
         assert_eq!(
-            engine.commit_buffer.capacity(),
-            warmed_up_capacity,
+            (
+                engine.raw_keys.capacity(),
+                engine.shown_text.capacity(),
+                engine.scratch.capacity(),
+            ),
+            warmed_up,
             "reallocation in the hot path"
         );
     }

@@ -7,13 +7,16 @@
 //! hello<TAB>hello
 //! ```
 //!
-//! The configuration comes from the file name: `telex-new.tsv`,
-//! `simple-telex-old.tsv`, `vni-new.tsv`.
+//! The file name selects the configuration: the first segment names the method
+//! (`telex`, `simple-telex`, `vni`), a trailing `old` or `new` names the tone
+//! style, and anything between them is a topic that the runner ignores. So
+//! `tests/corpus/telex-letters.tsv` runs Telex with the default tone style, and
+//! `tests/corpus/vni-new.tsv` runs VNI with the new style.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use viet_core::{Config, Engine, Input, Method, ToneStyle};
+use viet_core::{Action, Config, Engine, Input, Method, ToneStyle};
 
 /// One corpus line: the keystrokes and the text they must produce.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -82,11 +85,21 @@ pub fn commit_text(configuration: Config, input: &str) -> String {
             engine.feed(Input::Boundary);
             committed.push(character);
         } else {
-            committed.push_str(engine.feed(Input::Char(character)).commit);
+            // The action may rewrite text that is already on screen, so the
+            // runner has to honour `backspaces` the way a frontend would.
+            apply(&mut committed, engine.feed(Input::Char(character)));
         }
     }
     engine.feed(Input::Boundary);
     committed
+}
+
+/// Make `committed` look like the application after performing `action`.
+fn apply(committed: &mut String, action: Action<'_>) {
+    for _ in 0..action.backspaces {
+        committed.pop();
+    }
+    committed.push_str(action.commit);
 }
 
 fn read_cases(path: &Path) -> Result<Vec<Case>, String> {
@@ -132,29 +145,32 @@ fn configuration_from_filename(path: &Path) -> Result<Config, String> {
         .ok_or_else(|| format!("{}: file name is not valid UTF-8", path.display()))?;
 
     let mut parts: Vec<&str> = stem.split('-').collect();
-    let Some(tone_style_name) = parts.pop() else {
+    let tone_style = match parts.last().copied() {
+        Some("old") => {
+            parts.pop();
+            ToneStyle::Old
+        }
+        Some("new") => {
+            parts.pop();
+            ToneStyle::New
+        }
+        // Letter and tone rules of both styles are identical except for `oa/oe/uy`
+        // placement, so a topic file needs no style suffix to be unambiguous.
+        _ => ToneStyle::default(),
+    };
+    let name = parts.join("-");
+
+    let method = if name == "simple-telex" || name.starts_with("simple-telex-") {
+        Method::SimpleTelex
+    } else if name == "telex" || name.starts_with("telex-") {
+        Method::Telex
+    } else if name == "vni" || name.starts_with("vni-") {
+        Method::Vni
+    } else {
         return Err(format!(
-            "{}: file name must end with a tone style",
+            "{}: file name must start with a method (telex, simple-telex, vni), found '{name}'",
             path.display()
         ));
-    };
-    let method_name = parts.join("-");
-
-    let method = match method_name.as_str() {
-        "telex" => Method::Telex,
-        "simple-telex" => Method::SimpleTelex,
-        "vni" => Method::Vni,
-        other => {
-            return Err(format!(
-                "{}: unknown input method '{other}'",
-                path.display()
-            ))
-        }
-    };
-    let tone_style = match tone_style_name {
-        "new" => ToneStyle::New,
-        "old" => ToneStyle::Old,
-        other => return Err(format!("{}: unknown tone style '{other}'", path.display())),
     };
 
     Ok(Config {

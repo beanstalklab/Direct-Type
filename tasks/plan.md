@@ -35,7 +35,7 @@ Scope of this plan: `engine-core` only. The parallel spike (`docs/SPIKE-ime-feas
 Each task ends with something you can type into and observe via `viet-cli`.
 
 - [x] **T1.1 Buffer, boundary, passthrough + corpus runner**
-- [ ] **T1.2 Telex letter modifiers**
+- [x] **T1.2 Telex letter modifiers**
 - [ ] **T1.3 Syllable parser + tone index**
 
 **Checkpoint B:** `viet type --method telex "vieejt"` prints `việt`; parser unit tests cover `qu`, `gi`, 1/2/3-vowel nuclei, coda/no-coda.
@@ -80,7 +80,11 @@ Each task ends with something you can type into and observe via `viet-cli`.
 ## Open Questions
 
 - **Q1 (blocks T0.3):** confirm zero runtime crates + static table, vs `unicode-normalization`.
-- **Q2 (blocks T1.2):** corpus source. Options: hand-written rule cases only (slow, ~300 cases); import a public Vietnamese word list and derive Telex input programmatically (fast, needs a licence check); use `fcitx5-bamboo` as an oracle to compare outputs (best coverage, needs a harness — arguably its own task).
+- **Q2 (answered for T1.2):** corpus source. T1.2 used hand-written cases derived
+  from spec §3.2 — no imported word list, no third-party oracle. Still open: how the
+  corpus grows past `fixtures/anchor` cases to Checkpoint C's 2,000. Options: import
+  a public Vietnamese word list (needs a licence check) or compare against
+  `fcitx5-bamboo` as an oracle (best coverage, needs its own harness).
 - **Q3 (blocks T1.4):** default `tone_style`: `New` (`hòa/thủy`) proposed.
 - **Q4 (blocks first commit):** project name + licence. `unikey` is a trademark; rename before the repo is published.
 - **Q5:** `free_tone_mark` in v1 — proposed yes.

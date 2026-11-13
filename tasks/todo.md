@@ -126,11 +126,21 @@ cargo run -p viet-cli -- check tests/corpus
 **Description:** Implement the letter transformations from spec §3.2 for Telex: `aa/ee/oo`, `w`, `aw/ow/uw`, `dd`, `[`, `]`, with doubling to undo (`aaa → aa`, `ddd → dd`, `ww → w`). Pure mapping over the buffer; no tones yet.
 
 **Acceptance criteria:**
-- [ ] `vieejt`-class vowel runs transform correctly
-- [ ] Doubling undoes the modifier and keeps the literal key
-- [ ] All ~30 mapping cases in `tests/corpus/telex-letters.tsv` pass
-- [ ] Uppercase inputs map to uppercase outputs (`AA → Â`), lowercase to lowercase
-- [ ] No allocation regression
+- [x] `vieejt`-class vowel runs transform correctly (`viee → viê`; the tone key needs T1.4)
+- [x] Doubling undoes the modifier and keeps the literal key (`aaa → aa`, `ddd → dd`, `ww → w`, `uoww → uow`)
+- [x] All mapping cases in `tests/corpus/telex-letters.tsv` pass (56 cases, including the passthrough file)
+- [x] Uppercase inputs map to uppercase outputs (`AA → Â`), lowercase to lowercase
+- [x] No allocation regression (buffer capacities stable after warmup)
+- [x] Corpus runner honours `backspaces`, so a case can express a rewrite of an earlier character
+
+**Decisions recorded in this task:** `w` after `o` horns both letters of the `uo`
+pair (`uow → ươ`), because `ươ` is unreachable in one keystroke otherwise; `[` and
+`]` insert `ơ`/`ư` directly and do not modify a preceding letter; a letter carrying
+a different mark keeps it and the key stays literal (`awa → ăa`). Spec §3.2 and the
+corpus naming convention in §5 were updated in the same change.
+
+**Corpus source (Q2), for now:** hand-written cases derived from spec §3.2, no
+imported word list and no third-party oracle. Widening with an oracle stays open.
 
 **Verification:**
 ```bash

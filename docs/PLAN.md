@@ -10,11 +10,11 @@ Working name: `unikey` (placeholder — must be renamed before release, the name
 | `docs/PLAN.md` | this file | Goals, architecture, milestones, risks |
 | `docs/CAPABILITIES.md` | approved | Module map and build order; gate for all module specs |
 | `docs/SPIKE-ime-feasibility.md` | ready to run (needs GUI + sudo) | Phase 0 investigation: exact commands, app matrix, go/no-go on key injection |
-| `docs/SPEC-engine-core.md` | approved; Q1–Q5 open | Full spec for the first implementation module |
+| `docs/SPEC-engine-core.md` | approved; Q2 corpus size open | Full spec for the first implementation module |
 | `tasks/plan.md` | approved | Implementation order, risks, decisions for `engine-core` |
-| `tasks/todo.md` | T1.1 done; T1.2 blocked on corpus source | Task-by-task acceptance criteria and verification commands |
+| `tasks/todo.md` | T1.1 and T1.2 done; T1.3 next | Task-by-task acceptance criteria and verification commands |
 
-Per `AGENTS.md`, no implementation code is written until `CAPABILITIES.md` and the module spec are approved. `tasks/plan.md` and `tasks/todo.md` are written only after spec approval.
+Per `AGENTS.md`, no implementation code is written before `CAPABILITIES.md` and the module spec are approved; both are, and `tasks/plan.md` drives the work. When a plan decision changes, this file changes in the same commit.
 
 ## 1. Goal
 

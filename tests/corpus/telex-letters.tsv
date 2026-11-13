@@ -1,0 +1,57 @@
+# Telex letter modifiers, spec §3.2. Tone keys are not involved, so this file is
+# valid for both tone styles and carries no style suffix.
+#
+# Doubling the modifier is the undo: the second key is kept literally.
+aa	â
+ee	ê
+oo	ô
+aaa	aa
+eee	ee
+ooo	oo
+w	ư
+ww	w
+aw	ă
+ow	ơ
+uw	ư
+aww	aw
+oww	ow
+uww	uw
+dd	đ
+ddd	dd
+dD	đ
+DD	Đ
+DDD	DD
+[	ơ
+]	ư
+[[	[
+#
+# `w` after `o` horns both letters of the `uo` pair, because one keystroke has to
+# reach `ươ`; the undo restores both letters.
+uow	ươ
+duow	dươ
+uoww	uow
+uwow	ươ
+#
+# Letter modifiers inside words, including real Vietnamese spellings.
+viee	viê
+ddaay	đây
+ddoong	đông
+ddi	đi
+chuwa	chưa
+thuowng	thương
+dduowng	đương
+aa aa	â â
+ddaay ddaay	đây đây
+#
+# Case follows the letter carrying the mark, which is the first of the pair.
+AA	Â
+Aa	Â
+aA	â
+EE	Ê
+OO	Ô
+AW	Ă
+OW	Ơ
+UW	Ư
+W	Ư
+VIEE	VIÊ
+Viee	Viê

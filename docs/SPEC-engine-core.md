@@ -123,6 +123,14 @@ Keys arrive as characters, not keysyms. `ime-addon` maps keysyms → `char` (inc
 
 Doubling a tone key removes the tone and keeps the letter (`ass → as`, `a11 → a1` in VNI semantics must be defined by corpus, not guessed).
 
+Letter modifiers in Telex, in the detail T1.2 pinned down:
+
+- Doubling undoes the modifier and keeps the key literal: `aaa → aa`, `ddd → dd`, `ww → w`, `uoww → uow`.
+- `w` after `o` horns both letters of the `uo` pair, because one keystroke has to reach `ươ`: `uow → ươ`, `uwow → ươ`.
+- `[` and `]` insert `ơ` and `ư` themselves; they are listed as letters above, not as a modification of a preceding letter (`a[` is `aơ`, not `ă`).
+- A letter that already carries a different mark keeps it and the key stays literal: `awa → ăa`, `oow → ôw`.
+- Case follows the letter that carries the mark, which is the first of the pair: `AA → Â`, `aA → â`, `VIEE → VIÊ`.
+
 ### 3.3 Syllable model
 
 Parse the buffer into `onset · medial · nucleus · coda`, with a validity table for each. `qu` and `gi` are onsets, not vowel clusters. This is what makes `quà`, `quý`, `già`, `gì` place tones correctly.
@@ -152,7 +160,8 @@ Every rule above must be backed by at least three corpus cases, including a coun
 
 ## 4. Commands
 
-Run from the repository root. Nothing here is runnable yet — the toolchain is not installed on this host (see `docs/SPIKE-ime-feasibility.md` Step 0).
+Run from the repository root. `cargo` is user-local on this host, so source
+`~/.cargo/env` first; other hosts only need a stable toolchain with clippy.
 
 ```bash
 cargo fmt --all --check
@@ -208,7 +217,14 @@ hoaf	hoà	old tone style file
 quyeenf	quyền
 ```
 
-The runner feeds each input character as `Input::Char`, then `Input::Boundary`, and compares the concatenation of `commit` values. Uppercase and mixed case are explicit cases, not implicit behaviour.
+File names select the configuration: `method[-topic][-style].tsv`, where method is
+`telex`, `simple-telex` or `vni`, style is `old` or `new`, and the topic is free
+text the runner ignores. A missing style means the default (`new`). So
+`telex-letters.tsv` runs full Telex with the new style, `telex-new.tsv` runs the
+same configuration for tone cases, and `simple-telex-old.tsv` runs Simple Telex
+with old placement.
+
+The runner feeds each input character as `Input::Char`, then `Input::Boundary`, and compares the concatenation of `commit` values *after* honouring `backspaces`, so a case can express a modifier that rewrites an earlier character. Uppercase and mixed case are explicit cases, not implicit behaviour.
 
 ## 6. Code style
 
