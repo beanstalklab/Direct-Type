@@ -1,14 +1,13 @@
 // Types words through the addon's own typing path (`typing.cpp`), against a string instead
-// of an fcitx5 input context. This is the headless half of T4.2: the key classification, the
-// engine call, the character-wise deletion and the commit, all together.
+// of an fcitx5 input context: the key classification, the engine call, the preedit and the
+// commit, all together.
 //
-// What it cannot check is the last mile — that fcitx5 calls `keyEvent` and that the
-// application accepts the edits — which stays a human check in a real session.
+// What it cannot check is the last mile — that fcitx5 calls `keyEvent`, and that the
+// application renders the preedit and accepts the commit — which stays a human check.
 
 #include <cstdint>
 #include <cstdio>
 #include <string>
-#include <vector>
 
 #include "keys.h"
 #include "text_target.h"
@@ -26,27 +25,31 @@ void check(bool condition, const char *message) {
     }
 }
 
-/// A text buffer that behaves like an application: it deletes characters, not bytes, which
-/// is the lesson `crates/viet-ffi/tests/smoke.c` recorded for the C ABI.
+/// Compare text, printing both sides: a wrong byte in a UTF-8 literal is invisible otherwise.
+void checkEqual(const std::string &actual, const std::string &expected, const char *message) {
+    if (actual != expected) {
+        std::fprintf(stderr, "FAIL: %s (got \"%s\", expected \"%s\")\n", message,
+                     actual.c_str(), expected.c_str());
+        failures += 1;
+    }
+}
+
+/// An application that renders the preedit and appends what is committed to its text.
 class StringTarget final : public directtype::TextTarget {
 public:
-    void deleteBeforeCaret(unsigned int count) override {
-        while (count > 0 && !text_.empty()) {
-            std::size_t index = text_.size() - 1;
-            while (index > 0 && (static_cast<unsigned char>(text_[index]) & 0xC0) == 0x80) {
-                index -= 1;
-            }
-            text_.erase(index);
-            count -= 1;
-        }
+    void showPreedit(const std::string &text) override { preedit_ = text; }
+
+    void commit(const std::string &text) override {
+        committed_ += text;
+        preedit_.clear();
     }
 
-    void insert(const std::string &text) override { text_ += text; }
-
-    const std::string &text() const { return text_; }
+    const std::string &committed() const { return committed_; }
+    const std::string &preedit() const { return preedit_; }
 
 private:
-    std::string text_;
+    std::string committed_;
+    std::string preedit_;
 };
 
 /// UTF-8 for one code point, for the keys the application types itself.
@@ -75,15 +78,12 @@ class Typer {
 public:
     explicit Typer(viet_config_t configuration) : session_(configuration) {}
 
+    /// One key, the way `DirectTypeEngine::keyEvent` drives the session.
     void press(uint32_t codepoint) {
         const fcitx::KeySym symbol = fcitx::Key::keySymFromUnicode(codepoint);
         const directtype::KeyAction action =
             directtype::classify(symbol, fcitx::KeyState::NoState);
-        // A key the engine does not consume is typed by the application, which is what fcitx5
-        // does when the addon forwards it.
-        if (!session_.submit(action, codepoint, &target_)) {
-            target_.insert(utf8(codepoint));
-        }
+        apply(session_.type(action, codepoint), codepoint);
     }
 
     void type(const std::string &keys) {
@@ -92,29 +92,64 @@ public:
         }
     }
 
-    /// End the word the way a space does: the boundary runs, then the space itself is the
+    void backspace() { apply(session_.type(directtype::KeyAction::Backspace, 0), 0); }
+
+    /// End the word the way a space does: the boundary commits, then the space itself is the
     /// application's.
     void space() {
-        session_.submit(directtype::KeyAction::Boundary, 0, &target_);
-        target_.insert(" ");
+        apply(session_.type(directtype::KeyAction::Boundary, 0), 0);
+        target_.commit(" ");
     }
 
+    /// End the word without typing a key: the engine may rewrite the word before it is
+    /// committed.
     std::string finish() {
-        session_.submit(directtype::KeyAction::Boundary, 0, &target_);
-        return target_.text();
+        const directtype::TypingResult result =
+            session_.type(directtype::KeyAction::Boundary, 0);
+        if (result.ended) {
+            target_.showPreedit("");
+            target_.commit(result.text);
+        }
+        return target_.committed();
     }
 
-    std::string text() { return target_.text(); }
+    /// What the application shows right now: committed text plus the word being typed.
+    std::string text() { return target_.committed() + target_.preedit(); }
+
+    const std::string &preedit() const { return target_.preedit(); }
 
     bool vietnameseEnabled() const { return session_.vietnameseEnabled(); }
 
-    void setVietnameseEnabled(bool enabled) { session_.setVietnameseEnabled(enabled); }
+    void setVietnameseEnabled(bool enabled) {
+        // The engine finishes the word before a language switch, as the addon does.
+        if (session_.hasWord()) {
+            target_.showPreedit("");
+            target_.commit(session_.takeWord());
+        }
+        session_.setVietnameseEnabled(enabled);
+    }
 
     void setEngineConfiguration(const viet_config_t &configuration) {
+        if (session_.hasWord()) {
+            target_.showPreedit("");
+            target_.commit(session_.takeWord());
+        }
         session_.setEngineConfiguration(configuration);
     }
 
 private:
+    void apply(const directtype::TypingResult &result, uint32_t codepoint) {
+        if (result.ended) {
+            target_.showPreedit("");
+            target_.commit(result.text);
+        } else if (result.consumed) {
+            target_.showPreedit(result.text);
+        } else {
+            // The key is not ours: the application types it itself.
+            target_.commit(utf8(codepoint));
+        }
+    }
+
     directtype::TypingSession session_;
     StringTarget target_;
 };
@@ -132,13 +167,13 @@ viet_config_t telexConfiguration() {
 void expectWord(const std::string &keys, const std::string &expected, const char *name) {
     Typer typer(telexConfiguration());
     typer.type(keys);
-    check(typer.finish() == expected, name);
+    checkEqual(typer.finish(), expected, name);
 }
 
 } // namespace
 
 int main() {
-    expectWord("vieejt", "việt", "vieejt types viet");
+    expectWord("vieejt", "vi\xE1\xBB\x87" "t", "vieejt types viet");
     expectWord("dduowngf", "\xC4\x91\xC6\xB0\xE1\xBB\x9D" "ng", "dduowngf types duong");
     expectWord("uowng", "\xC6\xB0\xC6\xA1" "ng", "uowng horns both letters");
     expectWord("thuowr", "thu\xE1\xBB\x9F", "thuowr keeps the uo rhyme");
@@ -146,8 +181,17 @@ int main() {
     expectWord("aass", "aass", "an undone tone that leaves no syllable is restored");
     expectWord("toans", "to\xC3\xA1n", "the mark moves when the coda arrives");
 
-    // A word ends at a space and the next one starts fresh, which is what makes
-    // `Type::space` and `Input::Boundary` worth two separate calls.
+    // The word lives in the preedit and reaches the application only at the boundary.
+    {
+        Typer typer(telexConfiguration());
+        typer.type("vieejt");
+        check(typer.preedit() == "vi\xE1\xBB\x87" "t", "the word is the preedit");
+        check(typer.text() == "vi\xE1\xBB\x87" "t", "nothing was committed yet");
+        typer.space();
+        checkEqual(typer.text(), "vi\xE1\xBB\x87" "t ", "the boundary commits the word and the space");
+    }
+
+    // Two words in a row keep their own text.
     {
         Typer typer(telexConfiguration());
         typer.type("vieejt");
@@ -155,8 +199,18 @@ int main() {
         typer.type("asd");
         typer.space();
         typer.type("aas");
-        const std::string expected = "vi\xE1\xBB\x87t" " asd \xE1\xBA\xA5";
-        check(typer.finish() == expected, "two words and a space keep their own text");
+        check(typer.finish() == "vi\xE1\xBB\x87" "t asd \xE1\xBA\xA5",
+              "two words and a space keep their own text");
+    }
+
+    // Backspace in the word deletes a keystroke, not a character of the application.
+    {
+        Typer typer(telexConfiguration());
+        typer.type("aas");
+        check(typer.preedit() == "\xE1\xBA\xA5", "aas is a with circumflex and acute");
+        typer.backspace();
+        check(typer.preedit() == "\xC3\xA2", "backspace deletes the tone key, not the letter");
+        check(typer.finish() == "\xC3\xA2", "the word is committed after the delete");
     }
 
     // A capital is a word character: `Vieejt` is `Việt`.
@@ -164,7 +218,7 @@ int main() {
         Typer typer(telexConfiguration());
         typer.press('V');
         typer.type("ieejt");
-        check(typer.finish() == "Vi\xE1\xBB\x87t", "a capital stays a capital");
+        check(typer.finish() == "Vi\xE1\xBB\x87" "t", "a capital stays a capital");
     }
 
     // VNI through the same path.
@@ -184,42 +238,36 @@ int main() {
         check(typer.vietnameseEnabled(), "Vietnamese is on at the start");
         typer.setVietnameseEnabled(false);
         typer.type("vieejt");
-        check(typer.finish() == "vieejt", "English forwards every key untouched");
+        checkEqual(typer.finish(), "vieejt", "English forwards every key untouched");
     }
 
-    // A toggle drops the word in progress instead of rewriting it, and the next word starts
-    // fresh in the new language.
+    // A toggle finishes the word instead of dropping it, and the next word starts fresh.
     {
         Typer typer(telexConfiguration());
         typer.type("asd");
-        check(typer.text() == "\xC3\xA1" "d", "a live word is transformed");
+        check(typer.preedit() == "\xC3\xA1" "d", "a live word is in the preedit");
         typer.setVietnameseEnabled(false);
-        check(typer.text() == "\xC3\xA1" "d", "turning Vietnamese off edits nothing");
+        checkEqual(typer.text(), "\xC3\xA1" "d", "turning Vietnamese off commits the word, editing nothing");
         typer.setVietnameseEnabled(true);
-        check(typer.text() == "\xC3\xA1" "d", "turning it back on edits nothing either");
         typer.type("a");
-        check(typer.text() == "\xC3\xA1" "da",
-              "the next word starts fresh, without deleting the previous one");
+        checkEqual(typer.text(), "\xC3\xA1" "d" "a",
+                   "the next word starts fresh, without touching the previous one");
         typer.type("s");
-        check(typer.text() == "\xC3\xA1" "d\xC3\xA1",
-              "the fresh word transforms on its own");
+        checkEqual(typer.text(), "\xC3\xA1" "d\xC3\xA1", "the fresh word transforms on its own");
     }
 
-    // A settings change reaches the engine, and it drops the word in progress rather than
-    // finishing it under the new rule pack.
+    // A settings change finishes the word too: the engine would otherwise drop text the user
+    // already sees in the preedit.
     {
         Typer typer(telexConfiguration());
         typer.type("viee");
-        check(typer.text() == "vi\xC3\xAA", "a word is in progress");
-
+        check(typer.preedit() == "vi\xC3\xAA", "a word is in progress");
         viet_config_t vni = telexConfiguration();
         vni.method = 2;
         typer.setEngineConfiguration(vni);
-        check(typer.text() == "vi\xC3\xAA", "changing the method edits nothing");
-
+        checkEqual(typer.text(), "vi\xC3\xAA", "changing the method commits the word it had");
         typer.type("d9");
-        check(typer.text() == "vi\xC3\xAA\xC4\x91",
-              "the next word starts fresh, in the new method");
+        check(typer.preedit() == "\xC4\x91", "the next word starts fresh, in the new method");
     }
 
     if (failures != 0) {

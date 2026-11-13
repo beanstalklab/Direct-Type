@@ -257,6 +257,12 @@ Every rule above must be backed by at least three corpus cases, including a coun
   preedit. This is what makes the no-underline promise structural: the application
   only ever receives committed text, never a composition buffer.
 - Word boundary: commit the transformed buffer, clear state, `boundary = true`.
+The engine's contract is unchanged by the frontend's choice: `Action` still describes a
+deletion-and-insert against the text the application shows, and a frontend that keeps a
+preedit applies it to that preedit instead. The v1 fcitx5 addon does the latter, because
+Linux applications cannot be relied on to accept `deleteSurroundingText` (see
+`docs/PLAN.md`, decision 2026-11-13).
+
 - Backspace during composition removes the last *raw* key, then re-derives the
   transformation from scratch. This is why the engine keeps the raw key sequence
   alongside the transformed text: a delete has to be able to undo what a modifier did to

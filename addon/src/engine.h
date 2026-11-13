@@ -11,9 +11,13 @@
 
 /// The addon's engine: one input method, two languages, one Vietnamese state machine.
 ///
-/// The typing path and the language state live in `TypingSession`, which knows nothing
+/// The typing path and the word in progress live in `TypingSession`, which knows nothing
 /// about fcitx5; this class is the adapter around it: classify the key, apply the toggle
-/// key, submit the rest, and persist the settings.
+/// key, render the word as a preedit, commit it at the boundary, and persist the settings.
+///
+/// The word is kept in a preedit because Linux applications cannot be relied on to let an
+/// input method rewrite text they already received — Sublime Text and some terminals accept
+/// the commit and drop the deletion. UniKey and Bamboo do the same, for the same reason.
 ///
 /// `InputMethodEngineV2` rather than `InputMethodEngine` because the sub-mode label — the
 /// "Vietnamese"/"English" text in fcitx5's status area — only exists on V2:
@@ -51,9 +55,12 @@ public:
     void reloadConfig() override;
 
 private:
-    /// Feed one classified key and apply the result to `inputContext`.
-    bool consume(directtype::KeyAction action, uint32_t codepoint,
-                 fcitx::InputContext *inputContext);
+    /// Show the word in the preedit, or commit it when the word is finished.
+    void publish(const directtype::TypingResult &result, fcitx::InputContext *inputContext);
+
+    /// Finish the word in the preedit by committing it. Used when the word has to end for a
+    /// reason the engine does not see: a toggle, a configuration change, a lost focus.
+    void commitWord(fcitx::InputContext *inputContext);
 
     /// Push the persisted settings into the session.
     void applyConfiguration();

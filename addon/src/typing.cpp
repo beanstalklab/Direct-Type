@@ -1,7 +1,5 @@
 #include "typing.h"
 
-#include <string>
-
 namespace directtype {
 namespace {
 
@@ -12,12 +10,22 @@ viet_input_t characterInput(uint32_t codepoint) {
     return input;
 }
 
-/// kind: 2 is `Input::Boundary` in `viet.h`.
-viet_input_t boundaryInput() {
+viet_input_t simpleInput(int32_t kind) {
     viet_input_t input;
-    input.kind = 2;
+    input.kind = kind; // 1 backspace, 2 boundary, 3 reset
     input.code_point = 0;
     return input;
+}
+
+/// Remove one UTF-8 character from the end of `text`: the engine counts deletions in
+/// characters, and `ệ` is three bytes.
+void popCharacter(std::string &text) {
+    while (!text.empty() && (static_cast<unsigned char>(text.back()) & 0xC0) == 0x80) {
+        text.pop_back();
+    }
+    if (!text.empty()) {
+        text.pop_back();
+    }
 }
 
 } // namespace
@@ -31,10 +39,71 @@ TypingSession::~TypingSession() {
     }
 }
 
-void TypingSession::reset() {
-    if (engine_ != nullptr) {
-        viet_engine_reset(engine_);
+std::string TypingSession::takeWord() {
+    std::string word = word_;
+    word_.clear();
+    return word;
+}
+
+void TypingSession::feed(const viet_input_t &input) {
+    if (engine_ == nullptr) {
+        return;
     }
+    viet_action_t action;
+    const char *commit = nullptr;
+    viet_engine_feed(engine_, &input, &action, &commit, nullptr);
+
+    // The action is a deletion-and-insert against the text the engine has shown so far, which
+    // is exactly this buffer.
+    for (uint16_t index = 0; index < action.backspaces; ++index) {
+        popCharacter(word_);
+    }
+    if (action.commit_length > 0 && commit != nullptr) {
+        word_.append(commit, action.commit_length);
+    }
+}
+
+TypingResult TypingSession::type(KeyAction action, uint32_t codepoint) {
+    TypingResult result;
+    if (engine_ == nullptr || !vietnameseEnabled_) {
+        return result;
+    }
+
+    switch (action) {
+    case KeyAction::Backspace:
+        if (word_.empty()) {
+            // Nothing of ours to delete: the application deletes its own text.
+            return result;
+        }
+        feed(simpleInput(1));
+        result.consumed = true;
+        result.text = word_;
+        return result;
+    case KeyAction::Character:
+        feed(characterInput(codepoint));
+        result.consumed = true;
+        result.text = word_;
+        return result;
+    case KeyAction::Boundary:
+        if (word_.empty()) {
+            return result;
+        }
+        // `auto_restore` may rewrite the finished word; that rewrite belongs in the preedit,
+        // and then the whole word is committed.
+        feed(simpleInput(2));
+        result.ended = true;
+        result.text = takeWord();
+        return result;
+    }
+    return result;
+}
+
+void TypingSession::setVietnameseEnabled(bool enabled) {
+    if (enabled == vietnameseEnabled_) {
+        return;
+    }
+    reset();
+    vietnameseEnabled_ = enabled;
 }
 
 void TypingSession::setEngineConfiguration(const viet_config_t &configuration) {
@@ -43,38 +112,11 @@ void TypingSession::setEngineConfiguration(const viet_config_t &configuration) {
     }
 }
 
-void TypingSession::setVietnameseEnabled(bool enabled) {
-    if (enabled == vietnameseEnabled_) {
-        return;
+void TypingSession::reset() {
+    word_.clear();
+    if (engine_ != nullptr) {
+        viet_engine_reset(engine_);
     }
-    // Drop the word in progress. It is already committed on screen, so nothing visible
-    // changes, and the next key starts a new word under the new mode.
-    reset();
-    vietnameseEnabled_ = enabled;
-}
-
-bool TypingSession::submit(KeyAction action, uint32_t codepoint, TextTarget *target) {
-    if (engine_ == nullptr || !vietnameseEnabled_) {
-        return false;
-    }
-
-    const viet_input_t input = action == KeyAction::Character ? characterInput(codepoint)
-                                                              : boundaryInput();
-    viet_action_t result;
-    const char *commit = nullptr;
-    viet_engine_feed(engine_, &input, &result, &commit, nullptr);
-
-    if (target != nullptr) {
-        if (result.backspaces > 0) {
-            // Characters, not bytes: `ệ` is three bytes of UTF-8.
-            target->deleteBeforeCaret(result.backspaces);
-        }
-        if (result.commit_length > 0 && commit != nullptr) {
-            target->insert(std::string(commit, result.commit_length));
-        }
-    }
-
-    return result.consumed != 0;
 }
 
 } // namespace directtype

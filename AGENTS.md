@@ -76,7 +76,7 @@ When SOLID conflicts with clarity, prefer clarity and say why in the change.
 
 ## Verification
 
-Current phase: **Phase 4 done — the addon and its package are complete; Checkpoint G needs a machine with fcitx5**. The commands below are the only accepted
+Current phase: **Phase 4 done — the addon ships with a preedit (T4.7); real-session checks remain**. The commands below are the only accepted
 verification; run them from the repository root. Do not substitute different
 commands, and do not lower a check to get to green.
 
@@ -224,9 +224,18 @@ commands, and do not lower a check to get to green.
   packages when fcitx5 or the toolchain is absent. The module extracted from the package
   passes the addon load check, and CI builds and checks it. Target: Ubuntu 24.04+ x86_64
   (`libc6 (>= 2.39)`, `libfcitx5core7`); 22.04 or ARM needs a source build.
-- Checkpoint G is the only thing left in Phase 4: install on a machine with fcitx5, add
-  "Direct Type" in `fcitx5-configtool`, and type `vieejt` in a real application. Nothing on
-  this machine can do that — it has no fcitx5 daemon and no GUI.
+- **T4.7 done — the design changed under a real user.** The first install typed correctly in
+  Chrome but produced `DĐoôỗ Manhạnh Hungùng` in Sublime Text and a terminal: our design
+  committed every keystroke and depended on `deleteSurroundingText`, which those clients
+  accept and ignore. The word now lives in a **preedit** until the boundary, like UniKey and
+  Bamboo. `docs/PLAN.md` records the decision, its reversal of the v1 "no underline" goal,
+  and that `Direct-Type` now names the engine rather than today's behaviour. The engine is
+  unchanged; `Action` is still delete-and-insert, applied to the addon's buffer.
+- Also fixed while there: a toggle committed the word but left the engine's raw word alive,
+  so the next keystroke continued it (`ádasd…`); toggling now resets the engine too.
+- Checkpoint G remains the only thing left in Phase 4: install on a machine with fcitx5 and
+  type `vieejt` in a real application — and now, specifically, in Sublime Text and a
+  terminal, where the previous build failed.
 - `test` → `tét` stays `tét`: `tét` is real Vietnamese (`nét`, `mét`, `sét` share its
   rhyme), so no spelling rule may rewrite it. English typing needs the toggle key, or
   `free_tone_mark` off. Do not "fix" this by weakening the tables; the corpus case

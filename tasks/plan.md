@@ -80,6 +80,8 @@ direct typing through the C ABI (T4.2), then the language toggle (T4.3), configu
 - [x] **T4.4 Configuration UI**
 - [x] **T4.5 Tray indicator**
 - [x] **T4.6 One-command install**
+- [x] **T4.7 The word lives in a preedit** (from the first real install: deletion is not
+      portable, so v1 uses the preedit path for every application)
 
 **Checkpoint G:** `./install.sh` on a clean machine, then `vieejt` types `việt` in a real
 application, on GNOME Wayland, KDE Wayland and X11.

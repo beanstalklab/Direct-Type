@@ -16,6 +16,10 @@ enum class KeyAction {
     /// Can be part of a word and goes to the engine as `Input::Char`: letters, digits,
     /// and the Telex keys `[` and `]`.
     Character,
+    /// Deletes the last keystroke of the word instead of a character of the application's
+    /// text. `classify` never returns it: backspace is special-cased where the word is,
+    /// because only the caller knows whether there is a word to delete from.
+    Backspace,
 };
 
 /// Classify one key event.

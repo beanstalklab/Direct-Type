@@ -1,12 +1,20 @@
 # Direct-Type
 
-A multi-language input method for Linux, built around **direct typing**: keystrokes
-reach the application immediately, without a composition buffer, and therefore
-without the underline that composition-based input methods draw.
+A Vietnamese input method for Linux, built on a pure transformation engine that knows
+Vietnamese orthography and nothing else.
 
-The first language is Vietnamese. English needs no transformation, so it works as
-the identity path and exercises the language toggle. The engine is a rule pack, not
-a Vietnamese-specific program.
+The engine is **direct**: it answers a keystroke with "delete these characters, insert
+these", so a frontend *can* type without a composition buffer and without the underline
+that composition-based input methods draw. The fcitx5 addon that ships today keeps the
+word in a preedit until the word boundary, because Linux applications cannot be relied on
+to let an input method rewrite text they have already received: Sublime Text and some
+terminals accept the commit and drop the deletion, which turns `việt` into
+`vĐiệỗt`-shaped garbage. UniKey and Bamboo keep a preedit for the same reason. Direct
+commit, where the application proves it can be rewritten, is the direction of travel —
+not the v1 behaviour.
+
+The first language is Vietnamese. English needs no transformation, so it works as the
+identity path. The engine is a rule pack, not a Vietnamese-specific program.
 
 ## Status
 
@@ -28,8 +36,8 @@ Pre-alpha. What exists today:
 - 630 corpus cases and CI that runs formatting, lint, tests and the corpus.
 
 The fcitx5 addon types through the engine, has its language toggle and its settings: one
-input method named "Direct Type", text committed straight into the application with no
-preedit, Alt+Z to switch between Vietnamese and English, and method, tone placement,
+input method named "Direct Type", the word shown in a preedit and committed at the word
+boundary, Alt+Z to switch between Vietnamese and English, and method, tone placement,
 `auto_restore`, `spell_check`, `free_tone_mark` and the toggle key in
 `fcitx5-configtool` — all remembered across restarts in
 `~/.config/fcitx5/conf/directtype.conf`. fcitx5's status area shows the active language next
@@ -96,12 +104,18 @@ Vietnamese keeps them too — `test` becomes `tét`, because `tét` is a real sy
 - [`docs/SPEC-engine-core.md`](docs/SPEC-engine-core.md) — engine spec and decisions
 - [`docs/SPIKE-ime-feasibility.md`](docs/SPIKE-ime-feasibility.md) — platform feasibility spike
 
-## Why "direct"
+## Why the engine is "direct"
 
-Composition-based IMEs build a preedit string that the application renders
-underlined and only commit at a word boundary. That model is why typing Vietnamese
-on Linux feels like it "needs a spacebar", and why some applications show nothing
-until then. Direct typing removes the composition state instead of restyling it.
+A composition-based IME builds a preedit string that the application renders underlined
+and only commits at a word boundary. Direct typing replaces that model: the engine knows
+what the word should look like at every keystroke, so the frontend can commit the result
+immediately and rewrite what is already on screen when a modifier changes it.
+
+On Linux that last step is the hard part. `deleteSurroundingText` is optional for
+applications and several of them accept the commit while ignoring the deletion, so the
+v1 addon keeps the word in a preedit, exactly like the other Vietnamese IMEs for fcitx5.
+The engine is built so the direct path can be used wherever an application supports it —
+see `docs/PLAN.md` for the strategy table and the open question.
 
 ## Licence
 

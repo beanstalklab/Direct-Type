@@ -955,6 +955,60 @@ dpkg-deb --contents dist/directtype_*_amd64.deb
 `README.md`
 **Scope:** M
 
+## T4.7 — The word lives in a preedit
+
+**Description:** A user report from the first real install: Sublime Text and a terminal
+turned `Đỗ Mạnh Hùng` into `DĐoôỗ Manhạnh Hungùng`. Chrome was correct. Diagnosed as
+deletions being dropped: our design committed every keystroke and relied on
+`deleteSurroundingText` to rewrite it.
+
+**Acceptance criteria:**
+- [x] The word is held in the preedit until the word boundary, then committed
+- [x] A boundary key commits the word (after `auto_restore` gets its say) and is forwarded
+- [x] Backspace inside the word deletes a keystroke from the preedit, not a character of the
+      application; with no word, it is forwarded
+- [x] A toggle, a settings change or a lost focus finishes the word instead of dropping it
+- [x] The typing path stays headless-testable: `typing_check` checks the preedit, the commit,
+      backspace, two words in a row, and the toggle/config cases
+- [ ] A real session in Sublime Text and a terminal — **human check**
+
+**Decisions recorded in this task:**
+
+- Preedit for every application, decided by the user after the report. This reverses the
+  v1 "no underline" goal; `docs/PLAN.md` records the decision and why (UniKey and Bamboo hold
+  a preedit for the same platform reason), and the engine stays direct-capable so a frontend
+  that can rewrite text can use the direct path later. Consequence noted there too:
+  `Direct-Type` now names the engine, not today's behaviour.
+- The engine did not change: its `Action` is a deletion-and-insert against the text the
+  frontend shows, and in preedit mode that text is the addon's buffer. This is why the
+  rewrite was bounded — `TypingSession` applies the action to a `std::string` and the
+  fcitx5 adapter only renders it.
+- The word is committed on `reset` (focus loss, input method switch) and before a language
+  toggle or a configuration change, because the alternative is a word that is visible in
+  the preedit and never committed — text the user typed, silently lost.
+- A language toggle also resets the engine's raw word: committing the buffer without
+  dropping the engine state made the next keystroke continue the previous word, which the
+  typing test caught (`ádasd…` instead of `áda`).
+- `TextTarget` became two methods (`showPreedit`, `commit`) instead of
+  (`deleteBeforeCaret`, `insert`): the seam now describes what a preedit frontend does,
+  and the character-versus-byte deletion lesson moved into `TypingSession`.
+- Version bumped to `0.0.1` so the fix upgrades the installed package instead of needing a
+  reinstall.
+
+**Verification:**
+```bash
+ctest --test-dir addon/build --output-on-failure
+bash scripts/build_deb.sh
+```
+plus the human session.
+
+**Dependencies:** T4.6
+**Files:** `addon/src/text_target.h`, `addon/src/typing.h`, `addon/src/typing.cpp`,
+`addon/src/engine.h`, `addon/src/engine.cpp`, `addon/src/keys.h`,
+`addon/tests/typing_check.cpp`, `addon/CMakeLists.txt`, `README.md`, `docs/PLAN.md`,
+`docs/SPEC-engine-core.md`
+**Scope:** M
+
 ### Checkpoint G — installable
 - [ ] `./install.sh` on a clean machine, then `vieejt` types `việt` in a real app
 - [ ] GNOME Wayland, KDE Wayland and X11 each verified by a human

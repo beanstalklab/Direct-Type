@@ -2,6 +2,7 @@
 #define DIRECTTYPE_TYPING_H
 
 #include <cstdint>
+#include <string>
 
 #include "keys.h"
 #include "text_target.h"
@@ -9,11 +10,23 @@
 
 namespace directtype {
 
-/// The addon's typing state: the Vietnamese engine and whether it is switched on.
+/// What one keystroke means for the application.
+struct TypingResult {
+    /// The key belongs to the input method and must not reach the application.
+    bool consumed = false;
+    /// The word finished here: `text` is what to commit, and the session is empty again.
+    bool ended = false;
+    /// The word to show in the preedit, or the finished word when `ended` is true.
+    std::string text;
+};
+
+/// The addon's typing state: the Vietnamese engine, the word it is building, and whether
+/// Vietnamese is switched on.
 ///
-/// This is the whole behaviour of the addon apart from fcitx5 — a key either passes through
-/// or goes to the engine — and it owns no fcitx5 type, so it is what the tests drive. The
-/// fcitx5 adapter in `engine.cpp` classifies keys and forwards what this does not consume.
+/// The word is held here, not in the application. Each keystroke goes to the engine, whose
+/// answer is a deletion-and-insert against the text it has shown so far; that text is this
+/// buffer, so the same engine works whether the frontend rewrites committed text or keeps a
+/// preedit. It owns no fcitx5 type, so it is what the tests drive.
 class TypingSession {
 public:
     explicit TypingSession(const viet_config_t &configuration);
@@ -24,25 +37,35 @@ public:
 
     bool vietnameseEnabled() const { return vietnameseEnabled_; }
 
-    /// Drop the word in progress without changing the language.
-    void reset();
+    /// Whether a word is being built, i.e. whether there is a preedit to clear.
+    bool hasWord() const { return !word_.empty(); }
 
-    /// Apply a new engine configuration. The word in progress is dropped by the engine: a
-    /// settings change is not a typing event, and the text on screen was derived with the
-    /// previous rule pack.
-    void setEngineConfiguration(const viet_config_t &configuration);
+    /// Take the word out of the session, for a caller that has to finish it for a reason of
+    /// its own (a language toggle, a configuration change, a lost focus).
+    std::string takeWord();
 
-    /// Switch the language. The word in progress is dropped rather than rewritten: the text
-    /// on screen belongs to the application, and a toggle must never edit it. The next key
-    /// starts a fresh word, so nothing from the previous one leaks across the switch.
+    /// Feed one key. A boundary ends the word: `ended` is set and `text` is what to commit.
+    /// Backspace deletes the last keystroke from the word rather than from the application.
+    TypingResult type(KeyAction action, uint32_t codepoint);
+
+    /// Switch the language. The caller finishes the word first (with `takeWord` and a
+    /// commit); the session drops the engine's copy either way, so the next keystroke starts
+    /// a new word instead of continuing the one that was just committed.
     void setVietnameseEnabled(bool enabled);
 
-    /// Feed one classified key. Returns whether it was consumed; with Vietnamese off
-    /// nothing is consumed, so the application types the key itself.
-    bool submit(KeyAction action, uint32_t codepoint, TextTarget *target);
+    /// Apply a new engine configuration. The word in progress has to be finished by the
+    /// caller first: the engine drops it, because it was derived with the previous rules.
+    void setEngineConfiguration(const viet_config_t &configuration);
+
+    /// Drop everything, including the word.
+    void reset();
 
 private:
+    /// Feed one input and apply its deletion-and-insert to `word_`.
+    void feed(const viet_input_t &input);
+
     viet_engine_t *engine_;
+    std::string word_;
     bool vietnameseEnabled_;
 };
 

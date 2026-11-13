@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 # The addon version is the product version; the engine's crate version follows it.
-project(directtype-addon VERSION 0.0.0 LANGUAGES CXX)
+project(directtype-addon VERSION 0.0.1 LANGUAGES CXX)
 
 # fcitx5's package files default to `${CMAKE_INSTALL_PREFIX}/lib/fcitx5`, which on a Debian
 # install is `/usr/local/lib/fcitx5` - a directory fcitx5 never looks in. Ask for the

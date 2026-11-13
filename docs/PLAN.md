@@ -37,6 +37,16 @@ Two different IME architectures are being conflated:
 | Mechanism | engine builds a *preedit* string; app renders it | hook swallows key, emits final char |
 | Underline | drawn by the app for preedit (by design) | none — nothing is in composition |
 | Apps without preedit rendering (Sublime, some Electron) | text invisible until commit | works normally |
+
+**Decision 2026-11-13 (supersedes the "no composition underscore" goal for v1):** the v1
+addon uses the **preedit** strategy for every application. The direct path needs
+`deleteSurroundingText`, and Sublime Text and some terminals accept the commit while
+dropping the deletion, which produces visible garbage (`Đỗ` → `DĐoôỗ`). UniKey and Bamboo
+hold a preedit for the same reason. The engine stays direct-capable — it answers with
+delete-and-insert, which a frontend that can rewrite text uses directly — so the preedit is
+a frontend choice, revisitable per application once the survival matrix from the spike
+exists. Consequence: the name `Direct-Type` now describes the engine, not what the addon
+does today; the product name decision (D5) should be revisited before publishing.
 | Word finalization | needs an explicit commit (space/punctuation) | none |
 
 `Super+Space` is a third mechanism: GNOME's XKB *layout* switcher (`us` ↔ `vn`), unrelated to IME mode. Using it as an IME toggle cannot work while GNOME owns the binding. The installer must take ownership of the shortcut explicitly.

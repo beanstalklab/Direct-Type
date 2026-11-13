@@ -5,8 +5,11 @@
 
 #include <fcitx-config/iniparser.h>
 #include <fcitx-utils/capabilityflags.h>
+#include <fcitx-utils/key.h>
 #include <fcitx-utils/keysym.h>
 #include <fcitx/inputcontext.h>
+#include <fcitx/inputpanel.h>
+#include <fcitx/text.h>
 #include <fcitx/userinterface.h>
 
 #include "status.h"
@@ -19,30 +22,37 @@ namespace {
 /// directory, which is what survives a restart.
 constexpr const char *configurationPath = "conf/directtype.conf";
 
-/// Applies the engine's edits to an fcitx5 input context.
+/// Shows the word in progress to the application.
+///
+/// The preedit is where the word lives until a boundary. When the application supports a
+/// client-side preedit it is drawn in the text field itself (underlined, at the cursor);
+/// otherwise fcitx5 draws its own preedit window. Either way the application does not receive
+/// the text until the word is finished, which is what makes a modifier reliable.
 class InputContextTarget final : public directtype::TextTarget {
 public:
     explicit InputContextTarget(fcitx::InputContext *inputContext)
         : inputContext_(inputContext) {}
 
-    void deleteBeforeCaret(unsigned int count) override {
+    void showPreedit(const std::string &text) override {
         if (inputContext_ == nullptr) {
             return;
         }
-        // When the application supports surrounding text, delete by character count.
-        // Otherwise forward one backspace key per character, which every frontend
-        // understands. Either way it is characters, not bytes: `ệ` is three bytes.
-        if (inputContext_->capabilityFlags().test(fcitx::CapabilityFlag::SurroundingText)) {
-            inputContext_->deleteSurroundingText(-static_cast<int>(count), count);
+        if (text.empty()) {
+            inputContext_->inputPanel().reset();
         } else {
-            for (unsigned int index = 0; index < count; ++index) {
-                inputContext_->forwardKey(fcitx::Key(FcitxKey_BackSpace), false);
+            fcitx::Text preedit(text);
+            preedit.setCursor(static_cast<int>(text.size()));
+            if (inputContext_->capabilityFlags().test(fcitx::CapabilityFlag::Preedit)) {
+                inputContext_->inputPanel().setClientPreedit(preedit);
+            } else {
+                inputContext_->inputPanel().setPreedit(preedit);
             }
         }
+        inputContext_->updatePreedit();
     }
 
-    void insert(const std::string &text) override {
-        if (inputContext_ != nullptr) {
+    void commit(const std::string &text) override {
+        if (inputContext_ != nullptr && !text.empty()) {
             inputContext_->commitString(text);
         }
     }
@@ -54,7 +64,7 @@ private:
 } // namespace
 
 DirectTypeEngine::DirectTypeEngine()
-    : config_(), session_(directtype::toEngineConfiguration(config_)) {
+    : config_(), session_(toEngineConfiguration(config_)) {
     // The settings of the previous session, if there are any.
     reloadConfig();
 }
@@ -72,10 +82,24 @@ std::vector<fcitx::InputMethodEntry> DirectTypeEngine::listInputMethods() {
     return entries;
 }
 
-bool DirectTypeEngine::consume(directtype::KeyAction action, uint32_t codepoint,
+void DirectTypeEngine::publish(const directtype::TypingResult &result,
                                fcitx::InputContext *inputContext) {
     InputContextTarget target(inputContext);
-    return session_.submit(action, codepoint, &target);
+    if (result.ended) {
+        target.showPreedit("");
+        target.commit(result.text);
+    } else {
+        target.showPreedit(result.text);
+    }
+}
+
+void DirectTypeEngine::commitWord(fcitx::InputContext *inputContext) {
+    if (!session_.hasWord()) {
+        return;
+    }
+    InputContextTarget target(inputContext);
+    target.showPreedit("");
+    target.commit(session_.takeWord());
 }
 
 void DirectTypeEngine::keyEvent(const fcitx::InputMethodEntry &entry,
@@ -87,15 +111,17 @@ void DirectTypeEngine::keyEvent(const fcitx::InputMethodEntry &entry,
     }
 
     const fcitx::Key key = keyEvent.key();
+    fcitx::InputContext *inputContext = keyEvent.inputContext();
 
     // The toggle key is ours in both languages: it is the only way back out of English.
     if (config_.toggleKey.value().check(key)) {
+        // Finish the word first: a language switch must not leave a half-typed word in a
+        // preedit that nothing will ever commit.
+        commitWord(inputContext);
         session_.setVietnameseEnabled(!session_.vietnameseEnabled());
         config_.vietnameseEnabled.setValue(session_.vietnameseEnabled());
         save();
-        if (auto *inputContext = keyEvent.inputContext()) {
-            // The status area shows the language as a sub-mode. Refresh it here so the label
-            // follows the toggle immediately instead of waiting for the next focus change.
+        if (inputContext != nullptr) {
             inputContext->updateUserInterface(fcitx::UserInterfaceComponent::StatusArea, true);
         }
         keyEvent.filterAndAccept();
@@ -107,17 +133,27 @@ void DirectTypeEngine::keyEvent(const fcitx::InputMethodEntry &entry,
         return;
     }
 
+    // A backspace inside the word deletes a keystroke from it, not a character from the
+    // application: the application has not seen the word yet.
+    if (key.sym() == FcitxKey_BackSpace && session_.hasWord()) {
+        publish(session_.type(directtype::KeyAction::Backspace, 0), inputContext);
+        keyEvent.filterAndAccept();
+        return;
+    }
+
     const directtype::KeyAction action = directtype::classify(key.sym(), key.states());
     if (action == directtype::KeyAction::Boundary) {
-        // The word ends here, and `auto_restore` may rewrite it. The key itself is not
-        // consumed, so the space, tab or punctuation still reaches the application.
-        consume(action, 0, keyEvent.inputContext());
+        // The word ends here: `auto_restore` may rewrite it, and then it is committed. The
+        // boundary key itself is not consumed, so the space still reaches the application.
+        publish(session_.type(action, 0), inputContext);
         return;
     }
 
     const uint32_t codepoint = fcitx::Key::keySymToUnicode(key.sym());
-    if (consume(action, codepoint, keyEvent.inputContext())) {
-        // The engine committed the text itself; the key must not also be typed.
+    const directtype::TypingResult result = session_.type(action, codepoint);
+    if (result.consumed) {
+        // The key was typed into the preedit, so the application must not also receive it.
+        publish(result, inputContext);
         keyEvent.filterAndAccept();
     }
 }
@@ -125,11 +161,9 @@ void DirectTypeEngine::keyEvent(const fcitx::InputMethodEntry &entry,
 void DirectTypeEngine::reset(const fcitx::InputMethodEntry &entry,
                              fcitx::InputContextEvent &event) {
     (void)entry;
-    if (session_.vietnameseEnabled()) {
-        // Focus loss ends the word, so an invalid one is given back before the state is
-        // dropped; whether a commit after focus loss is honoured is the frontend's choice.
-        consume(directtype::KeyAction::Boundary, 0, event.inputContext());
-    }
+    // Focus loss or an input method switch ends the word: commit it rather than dropping what
+    // the user typed. Whether a commit after focus loss is honoured is the frontend's choice.
+    commitWord(event.inputContext());
     session_.reset();
 }
 
@@ -157,6 +191,6 @@ void DirectTypeEngine::reloadConfig() {
 }
 
 void DirectTypeEngine::applyConfiguration() {
-    session_.setEngineConfiguration(directtype::toEngineConfiguration(config_));
+    session_.setEngineConfiguration(toEngineConfiguration(config_));
     session_.setVietnameseEnabled(config_.vietnameseEnabled.value());
 }

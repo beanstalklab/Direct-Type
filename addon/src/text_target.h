@@ -5,22 +5,26 @@
 
 namespace directtype {
 
-/// What the typing logic needs from the application: delete characters before the caret and
-/// insert text. fcitx5 implements this with `InputContext::deleteSurroundingText` and
-/// `commitString`; a test implements it on a `std::string`.
+/// What the typing logic needs from the application: show the word that is being typed, and
+/// commit it when it is finished.
 ///
-/// Two methods, on purpose: the typing logic then depends on this seam instead of on
-/// fcitx5, so it can be checked without a session, and the fcitx5 details (surrounding text
-/// capability, backspace fallback) stay in one adapter.
+/// Two methods, on purpose: the typing logic depends on this seam instead of on fcitx5, so it
+/// can be checked without a session, and the fcitx5 details (client preedit versus panel
+/// preedit) stay in one adapter.
+///
+/// The word lives in the preedit until a boundary, because Linux applications cannot be
+/// trusted to let an input method rewrite text they already received: Sublime Text and some
+/// terminals accept the commit and drop the deletion, which turns `việt` into `vĐiệỗt`-shaped
+/// garbage. UniKey and Bamboo hold a preedit for the same reason.
 class TextTarget {
 public:
     virtual ~TextTarget() = default;
 
-    /// Delete `count` characters, not bytes, before the caret.
-    virtual void deleteBeforeCaret(unsigned int count) = 0;
+    /// Show `text` as the word in progress. An empty string clears the preedit.
+    virtual void showPreedit(const std::string &text) = 0;
 
-    /// Insert `text` at the caret.
-    virtual void insert(const std::string &text) = 0;
+    /// Give the finished word to the application.
+    virtual void commit(const std::string &text) = 0;
 };
 
 } // namespace directtype
