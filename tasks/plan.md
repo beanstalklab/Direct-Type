@@ -75,7 +75,7 @@ direct typing through the C ABI (T4.2), then the language toggle (T4.3), configu
 (T4.4), the status indicator (T4.5), and one-command install (T4.6).
 
 - [x] **T4.1 Addon that loads**
-- [ ] **T4.2 Direct typing through the C ABI**
+- [x] **T4.2 Direct typing through the C ABI**
 - [ ] **T4.3 Language toggle**
 - [ ] **T4.4 Configuration UI**
 - [ ] **T4.5 Tray indicator**

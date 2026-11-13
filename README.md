@@ -27,9 +27,10 @@ Pre-alpha. What exists today:
   `crates/viet-ffi/tests/smoke.c` is a C caller linked against both library artifacts.
 - 630 corpus cases and CI that runs formatting, lint, tests and the corpus.
 
-The fcitx5 addon exists but does not type yet: it loads, offers one input method named
-"Direct Type", and forwards every key unchanged (T4.1). Wiring the engine in is T4.2, and
-the one-command install is T4.6 — so there is still nothing to install.
+The fcitx5 addon types through the engine (T4.2): it loads, offers one input method named
+"Direct Type", and commits text straight into the application with no preedit. It has no
+language toggle, no settings UI and no installer yet (T4.3–T4.6), so there is still nothing
+to install.
 
 ## Build and test
 

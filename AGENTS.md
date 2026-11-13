@@ -76,7 +76,7 @@ When SOLID conflicts with clarity, prefer clarity and say why in the change.
 
 ## Verification
 
-Current phase: **Phase 4 — `ime-addon`, T4.1 done, T4.2 (direct typing) next**. The commands below are the only accepted
+Current phase: **Phase 4 — `ime-addon`, T4.2 done (typing), T4.3 (language toggle) next**. The commands below are the only accepted
 verification; run them from the repository root. Do not substitute different
 commands, and do not lower a check to get to green.
 
@@ -184,11 +184,20 @@ commands, and do not lower a check to get to green.
   `${CMAKE_INSTALL_PREFIX}/lib/fcitx5` (`/usr/local/...`, a directory fcitx5 never reads)
   unless `FCITX_INSTALL_USE_FCITX_SYS_PATHS=On`. `DIRECTTYPE_ADDON_DIR` and
   `DIRECTTYPE_DATA_DIR` are the cache variables to override for a per-user install.
+- **T4.2 done**: the addon types through the C ABI. The typing path lives in
+  `addon/src/typing.cpp` and depends on a two-method `TextTarget` (delete characters, insert
+  text) instead of fcitx5, so `addon/tests/typing_check.cpp` types real words headlessly —
+  `vieejt` → `việt`, `dduowngf` → `đường`, `asd` → `asd`, `thuowr` → `thuở`, VNI, two words
+  in a row. `src/keys.cpp` decides which keys are word characters (ASCII letters and digits,
+  `[`, `]`, Latin-1/Extended-A/Extended-B, Latin Extended Additional), and everything else
+  ends the word and is forwarded. Deletion uses `deleteSurroundingText` when the app
+  supports surrounding text, otherwise forwarded backspaces. Three addon ctest cases, all
+  mutation-checked.
 - **The fcitx5 daemon is not installed on this machine** (only `libfcitx5core-dev` and the
   frontends), so loading into a running session, `fcitx5-configtool` and typing in real
-  applications are human checks on a machine that has fcitx5.
-- Nothing is installable yet: no installer, no toggle key, no tray. Next is T4.2 — wire
-  `viet_engine_feed` into `keyEvent` and apply `backspaces` + `commit`.
+  applications are human checks on a machine that has fcitx5. That is the only part of
+  T4.2's acceptance still open.
+- Nothing is installable yet: no toggle, no config UI, no tray, no installer. Next is T4.3.
 - `test` → `tét` stays `tét`: `tét` is real Vietnamese (`nét`, `mét`, `sét` share its
   rhyme), so no spelling rule may rewrite it. English typing needs the toggle key, or
   `free_tone_mark` off. Do not "fix" this by weakening the tables; the corpus case

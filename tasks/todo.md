@@ -695,27 +695,56 @@ plus a human check that fcitx5 lists the input method.
 ## T4.2 — Direct typing through the C ABI
 
 **Description:** Map fcitx5 key events to `viet_input_t`, call `viet_engine_feed`, and
-apply the result: delete `backspaces` **characters** with
-`InputContext::deleteSurroundingText`, then `commitString`. Send `Boundary` for space,
-enter, tab, punctuation and focus loss, and forward every key the engine does not consume.
-This is the slice where the product promise becomes real: no preedit, no underline.
+apply the result: delete `backspaces` **characters**, then `commitString`. Send `Boundary`
+for space, enter, tab, punctuation and focus loss, and forward every key the engine does not
+consume. This is the slice where the product promise becomes real: no preedit, no underline.
 
 **Acceptance criteria:**
-- [ ] `vieejt` types `việt` in a real application on GNOME Wayland, KDE Wayland and X11
-- [ ] Nothing is underlined: the engine never sets a preedit string
-- [ ] `deleteSurroundingText` deletes characters, not bytes (the C smoke test's
-      `delete_characters` is the reference)
-- [ ] Space and punctuation still reach the application after the rewrite
-- [ ] Focus loss sends `Boundary`, so a word is never left half-transformed
+- [x] The addon types through the engine: `vieejt` → `việt`, `dduowngf` → `đường`,
+      `asd` → `asd`, `thuowr` → `thuở`, VNI `d9u7o7ng2` → `đường`, and two words in a row
+- [x] Nothing is underlined: the engine never sets a preedit string, and the addon never
+      commits one
+- [x] Deletions count characters, not bytes, with a forward-key fallback for applications
+      that do not support surrounding text
+- [x] A boundary key (space, punctuation, shortcut, focus loss) ends the word and is then
+      forwarded, so the space still inserts a space
+- [ ] Typing in a real application on GNOME Wayland, KDE Wayland and X11 — **human check**,
+      the fcitx5 daemon is not installed on this machine
+
+**Decisions recorded in this task:**
+
+- The typing path lives in `src/typing.cpp` and depends on a two-method `TextTarget`
+  (delete characters, insert text), not on fcitx5. `DirectTypeEngine` is the adapter that
+  implements `TextTarget` over `InputContext` and classifies keys. That split is what makes
+  the whole path testable without a session: `addon/tests/typing_check.cpp` types words
+  against a `std::string` and checks the text, including the character-wise deletion and
+  the multi-word case. Mutation-checked: dropping the deletion fails it.
+- Which keystrokes are word characters is a product decision, not a Unicode property
+  (`src/keys.cpp`): ASCII letters and digits, `[` and `]`, Latin-1/Extended-A/Extended-B
+  (`ă ơ ư đ` on a Vietnamese layout) and Latin Extended Additional (`ệ ỹ`). Everything else
+  is a boundary and reaches the application untouched. `addon/tests/key_mapping_check.cpp`
+  pins it, including Ctrl/Alt shortcuts and keys that type nothing. The first version of
+  that range stopped at Latin Extended-A, which made `ơ` (0x01A1) and `ư` (0x01B0) word
+  *separators* — the test caught it, and a Vietnamese layout would not have typed at all.
+- The engine is linked statically (`libviet.a`) so the addon ships as one module with no
+  runtime path to a second library. `cargo` runs as a CMake target on every build, so the
+  module can never link a stale engine; cargo itself is a no-op when nothing changed.
+- Deletion uses `deleteSurroundingText` when the application advertises surrounding text and
+  otherwise forwards one backspace key per character. The forward-key path is the one that
+  works in terminals and older toolkits; it is untested until the human session test.
 
 **Verification:**
 ```bash
-bash scripts/c_smoke_test.sh        # the ABI this addon uses
+cmake -S addon -B addon/build -DCMAKE_BUILD_TYPE=Release
+cmake --build addon/build
+ctest --test-dir addon/build --output-on-failure
 ```
-plus the human typing in three applications on each of the three session types.
+plus the human typing test in real applications.
 
 **Dependencies:** T4.1
-**Files:** `addon/src/engine.cpp`, `addon/src/engine.h`
+**Files:** `addon/src/typing.h`, `addon/src/typing.cpp`, `addon/src/text_target.h`,
+`addon/src/keys.h`, `addon/src/keys.cpp`, `addon/src/engine.h`, `addon/src/engine.cpp`,
+`addon/tests/typing_check.cpp`, `addon/tests/key_mapping_check.cpp`, `addon/CMakeLists.txt`
 **Scope:** M
 
 ## T4.3 — Language toggle
