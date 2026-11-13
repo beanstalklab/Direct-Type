@@ -30,3 +30,6 @@ jobs:
 
       - name: Build
         run: cargo build --workspace
+
+      - name: C ABI smoke test
+        run: bash scripts/c_smoke_test.sh

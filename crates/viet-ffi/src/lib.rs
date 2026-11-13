@@ -1,7 +1,13 @@
 //! C ABI for the Vietnamese engine. See `include/viet.h`.
 //!
-//! This is the only crate allowed to contain `unsafe`, and the only place where
-//! a panic may cross a foreign boundary — contained by `catch_unwind`.
+//! This crate and the allocation-counting test (spec decision D8) are the only places
+//! allowed to contain `unsafe`, and this is the only place where a panic may reach a
+//! foreign boundary — contained by `catch_unwind`, because unwinding into C is undefined
+//! behaviour.
+//!
+//! Strings are length-delimited in bytes and are **not** NUL-terminated: the engine hands
+//! out a pointer into its own buffer, so a C caller must read `commit_length` bytes and
+//! never call `strlen`.
 
 #![allow(non_camel_case_types)]
 
@@ -72,6 +78,28 @@ fn decode_configuration(configuration: &viet_config_t) -> Config {
         spell_check: configuration.spell_check != 0,
         free_tone_mark: configuration.free_tone_mark != 0,
     }
+}
+
+/// Run `body` with panics contained. `None` means it panicked and the caller's no-op
+/// action stands.
+fn catching_panic<R>(body: impl FnOnce() -> R) -> Option<R> {
+    catch_unwind(AssertUnwindSafe(body)).ok()
+}
+
+// Asks the next `feed` to panic, so the containment test drives the real function instead
+// of a closure that stands in for it. Never compiled into a shipped build.
+#[cfg(test)]
+thread_local! {
+    static PANIC_NEXT_FEED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(test)]
+fn maybe_panic_for_test() {
+    PANIC_NEXT_FEED.with(|flag| {
+        if flag.replace(false) {
+            panic!("forced panic: the C boundary has to contain this");
+        }
+    });
 }
 
 fn decode_input(input: &viet_input_t) -> Option<Input> {
@@ -164,7 +192,9 @@ pub unsafe extern "C" fn viet_engine_feed(
 
     // All writes happen inside the guard: `Action` borrows the engine, so it
     // cannot escape the closure. A panic leaves the no-op action set above.
-    let _ = catch_unwind(AssertUnwindSafe(|| {
+    let _ = catching_panic(|| {
+        #[cfg(test)]
+        maybe_panic_for_test();
         let action = transform_engine.feed(input_event);
         *out_action = viet_action_t {
             consumed: i32::from(action.consumed),
@@ -180,5 +210,223 @@ pub unsafe extern "C" fn viet_engine_feed(
         if !out_preedit.is_null() {
             *out_preedit = action.preedit.as_ptr() as *const c_char;
         }
-    }));
+    });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn character_input(character: char) -> viet_input_t {
+        viet_input_t {
+            kind: 0,
+            code_point: u32::from(character),
+        }
+    }
+
+    fn boundary_input() -> viet_input_t {
+        viet_input_t {
+            kind: 2,
+            code_point: 0,
+        }
+    }
+
+    /// One action of the ABI, copied into Rust-owned memory: what a frontend sees.
+    struct Step {
+        consumed: i32,
+        backspaces: u16,
+        commit: String,
+        boundary: i32,
+    }
+
+    fn feed(engine: *mut viet_engine, input: viet_input_t) -> Step {
+        let mut action = viet_action_t::none();
+        let mut commit: *const c_char = std::ptr::null();
+        // SAFETY: the pointers are valid for the call, and `engine` came from
+        // `viet_engine_new`.
+        unsafe {
+            viet_engine_feed(
+                engine,
+                &input,
+                &mut action,
+                &mut commit,
+                std::ptr::null_mut(),
+            );
+        }
+        let commit = if commit.is_null() || action.commit_length == 0 {
+            String::new()
+        } else {
+            // SAFETY: the span is engine-owned, valid until the next feed on the same
+            // engine, and `commit_length` bytes long.
+            let bytes = unsafe {
+                std::slice::from_raw_parts(commit as *const u8, action.commit_length as usize)
+            };
+            std::str::from_utf8(bytes)
+                .expect("the commit is UTF-8")
+                .to_string()
+        };
+        Step {
+            consumed: action.consumed,
+            backspaces: action.backspaces,
+            commit,
+            boundary: action.boundary,
+        }
+    }
+
+    /// Apply one step the way the addon will.
+    fn perform(text: &mut String, step: Step) {
+        for _ in 0..step.backspaces {
+            text.pop();
+        }
+        text.push_str(&step.commit);
+    }
+
+    /// Type a word and end it, returning the text the application shows.
+    fn type_keys(engine: *mut viet_engine, keys: &str) -> String {
+        let mut text = String::new();
+        for key in keys.chars() {
+            let step = feed(engine, character_input(key));
+            assert_eq!(step.consumed, 1, "a typed key is consumed: {key:?}");
+            perform(&mut text, step);
+        }
+        let step = feed(engine, boundary_input());
+        assert_eq!(step.consumed, 0, "the boundary key is forwarded");
+        assert_eq!(step.boundary, 1);
+        perform(&mut text, step);
+        text
+    }
+
+    #[test]
+    fn the_abi_types_a_word_the_way_the_engine_does() {
+        // SAFETY: a NULL configuration selects the default, and the pointer is freed once.
+        let engine = unsafe { viet_engine_new(std::ptr::null()) };
+        assert!(!engine.is_null());
+        assert_eq!(type_keys(engine, "vieejt"), "việt");
+        assert_eq!(type_keys(engine, "dduowngf"), "đường");
+        assert_eq!(
+            type_keys(engine, "asd"),
+            "asd",
+            "auto_restore is on by default"
+        );
+        // SAFETY: the pointer came from `viet_engine_new`.
+        unsafe { viet_engine_free(engine) };
+    }
+
+    #[test]
+    fn the_commit_span_is_counted_in_bytes() {
+        // `â` is two bytes, so a caller that trusted a character count or `strlen` would
+        // read the wrong span.
+        // SAFETY: as above.
+        let engine = unsafe { viet_engine_new(std::ptr::null()) };
+        let mut action = viet_action_t::none();
+        let mut commit: *const c_char = std::ptr::null();
+        for key in ['a', 'a'] {
+            let input = character_input(key);
+            // SAFETY: as above.
+            unsafe {
+                viet_engine_feed(
+                    engine,
+                    &input,
+                    &mut action,
+                    &mut commit,
+                    std::ptr::null_mut(),
+                );
+            }
+        }
+        assert_eq!(action.backspaces, 1);
+        assert_eq!(action.commit_length, "â".len() as u32);
+        assert_eq!(action.preedit_length, 0, "there is no composition buffer");
+        // SAFETY: the span is engine-owned and `commit_length` bytes long.
+        let bytes = unsafe {
+            std::slice::from_raw_parts(commit as *const u8, action.commit_length as usize)
+        };
+        assert_eq!(std::str::from_utf8(bytes), Ok("â"));
+        unsafe { viet_engine_free(engine) };
+    }
+
+    #[test]
+    fn unknown_inputs_and_null_arguments_are_a_no_op() {
+        // SAFETY: as above.
+        let engine = unsafe { viet_engine_new(std::ptr::null()) };
+        let mut action = viet_action_t::none();
+        let mut commit: *const c_char = std::ptr::null();
+
+        // An unknown kind decodes to nothing and leaves the no-op action in place.
+        let unknown = viet_input_t {
+            kind: 99,
+            code_point: u32::from('a'),
+        };
+        // SAFETY: as above.
+        unsafe {
+            viet_engine_feed(
+                engine,
+                &unknown,
+                &mut action,
+                &mut commit,
+                std::ptr::null_mut(),
+            );
+        }
+        assert_eq!(action.consumed, 0);
+        assert_eq!(action.backspaces, 0);
+        assert!(commit.is_null());
+
+        // A NULL engine is a no-op rather than a crash, which is what a frontend that has
+        // already torn its engine down will pass.
+        let character = character_input('a');
+        // SAFETY: a NULL engine is documented as a no-op.
+        unsafe {
+            viet_engine_feed(
+                std::ptr::null_mut(),
+                &character,
+                &mut action,
+                &mut commit,
+                std::ptr::null_mut(),
+            );
+        }
+        assert_eq!(action.consumed, 0);
+
+        // NULL outputs are allowed, and a NULL action is refused before anything else.
+        // SAFETY: NULL outputs are documented as optional.
+        unsafe {
+            viet_engine_feed(
+                engine,
+                &character,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            );
+            viet_engine_reset(std::ptr::null_mut());
+            viet_engine_free(std::ptr::null_mut());
+            viet_engine_free(engine);
+        }
+    }
+
+    #[test]
+    fn a_panic_in_the_engine_is_contained() {
+        // SAFETY: as above.
+        let engine = unsafe { viet_engine_new(std::ptr::null()) };
+        let input = character_input('a');
+        let mut action = viet_action_t::none();
+        let mut commit: *const c_char = std::ptr::null();
+
+        PANIC_NEXT_FEED.with(|flag| flag.set(true));
+        // SAFETY: as above. The forced panic must not unwind through this call.
+        unsafe {
+            viet_engine_feed(
+                engine,
+                &input,
+                &mut action,
+                &mut commit,
+                std::ptr::null_mut(),
+            );
+        }
+        assert_eq!(action.consumed, 0, "a panicking feed reports a no-op");
+        assert_eq!(action.backspaces, 0);
+        assert_eq!(action.commit_length, 0);
+        assert!(commit.is_null());
+
+        // The engine is still usable afterwards: the panic is reported, not fatal.
+        assert_eq!(type_keys(engine, "aa"), "â");
+        unsafe { viet_engine_free(engine) };
+    }
 }

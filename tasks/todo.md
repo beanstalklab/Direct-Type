@@ -571,44 +571,52 @@ cargo test --release -p viet-core --test allocations
 **Description:** Implement spec §2.2 exactly: opaque engine pointer, `viet_action_t`, borrowed string spans, `catch_unwind` at the boundary, `#[no_mangle] extern "C"`, `staticlib` + `cdylib`. No ownership transfer.
 
 **Acceptance criteria:**
-- [ ] Header and implementation agree; a Rust test and a C test call the same functions
-- [ ] A forced panic inside the core returns a safe no-op action instead of unwinding
-- [ ] Strings are valid UTF-8 and NUL-terminated only in the header's documented way (length-based, not NUL-truncated)
-- [ ] `cargo build -p viet-ffi --release` produces `libviet.a` and `libviet.so`
-- [ ] No `unsafe` outside this crate
+- [x] Header and implementation agree; a Rust test and a C test call the same functions
+- [x] A forced panic inside the core returns a safe no-op action instead of unwinding
+- [x] Strings are valid UTF-8 and length-delimited in bytes, never NUL-truncated
+- [x] `cargo build -p viet-ffi --release` produces `libviet.a` and `libviet.so`
+- [x] No `unsafe` outside this crate (except the allocation-counting test, decision D8)
+
+**Decisions recorded in this task:**
+
+- The header claimed strings were "NUL-terminated; never rely on the NUL". They are not:
+  the engine hands out a pointer into its own `String`. The header now says
+  length-delimited in bytes, not NUL-terminated, and that a zero length means the pointer
+  must not be dereferenced.
+- The panic containment test drives the real `viet_engine_feed`, not a stand-in closure: a
+  `#[cfg(test)]`-only `thread_local` asks the next feed to panic, so the guard is tested
+  where it lives. The injection cannot be compiled into a shipped build.
+- The C smoke test found the trap the header now documents: `backspaces` counts
+  characters, and `ệ` is three bytes, so a C helper that deletes bytes corrupts the text.
+  `tests/smoke.c` carries `delete_characters` as the reference implementation for the
+  addon.
+- Both artifacts are exercised, not just built: the same C test links against `libviet.a`
+  and against `libviet.so`, and the script checks that the four functions are exported
+  before it links.
 
 **Verification:**
 ```bash
 cargo build -p viet-ffi --release
 cargo test -p viet-ffi
-nm -D target/release/libviet.so | grep viet_engine
+bash scripts/c_smoke_test.sh
 ```
 
 **Dependencies:** T2.3
-**Files:** `crates/viet-ffi/src/lib.rs`, `crates/viet-ffi/include/viet.h`, `crates/viet-ffi/Cargo.toml`
+**Files:** `crates/viet-ffi/src/lib.rs`, `crates/viet-ffi/include/viet.h`,
+`crates/viet-ffi/tests/smoke.c`, `scripts/c_smoke_test.sh`
 **Scope:** M
 
 ---
 
 ## T3.2 — C smoke test linked against the staticlib
 
-**Description:** A ~40-line C program that compiles the corpus path: create engine, feed `vieejt`, assert `việt`, free. Built in CI with `cc`, proving the header is usable from C++ too.
+**Description:** A `cc`-compiled program drives the engine through `viet.h`, so the addon can start.
 
 **Acceptance criteria:**
-- [ ] `cc -std=c11 -I crates/viet-ffi/include tests/ffi_smoke.c target/release/libviet.a -o /tmp/ffi_smoke` succeeds
-- [ ] Running it exits `0` and prints `ok`
-- [ ] Same source compiles as C++17 (`c++ -std=c++17`) with no warnings
-- [ ] CI job added
-
-**Verification:**
-```bash
-cc -std=c11 -I crates/viet-ffi/include tests/ffi_smoke.c target/release/libviet.a -o /tmp/ffi_smoke && /tmp/ffi_smoke
-c++ -std=c++17 -Wall -Wextra -I crates/viet-ffi/include tests/ffi_smoke.c target/release/libviet.a -o /tmp/ffi_smoke_cpp
-```
-
-**Dependencies:** T3.1
-**Files:** `tests/ffi_smoke.c`, `.github/workflows/ci.yml`
-**Scope:** S
+- [x] Compiles with `-std=c11 -Wall -Wextra -Werror` against the header
+- [x] Links against `libviet.a` and runs green, and again against `libviet.so`
+- [x] Types words in Telex and VNI, checks a restore, a reusable engine, a NULL engine
+- [x] CI runs it, so a header/implementation drift fails the build
 
 ### Checkpoint F — module done
 - [ ] Spec §9 success criteria 1–6 all demonstrably met

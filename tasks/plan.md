@@ -63,10 +63,10 @@ Each task ends with something you can type into and observe via `viet-cli`.
 
 ### Phase 3 — Boundary for the addon
 
-- [ ] **T3.1 `viet-ffi`: C ABI, header, panics contained**
-- [ ] **T3.2 C smoke test linked against the staticlib**
+- [x] **T3.1 `viet-ffi`: C ABI, header, panics contained**
+- [x] **T3.2 C smoke test linked against the staticlib**
 
-**Checkpoint F:** `cc`-compiled test program drives the engine through `viet.h`; `ime-addon` can start.
+**Checkpoint F:** met — `scripts/c_smoke_test.sh` compiles `tests/smoke.c`, links it against `libviet.a` and `libviet.so`, and runs it green in CI. `ime-addon` can start.
 
 ## Risks and Mitigations
 

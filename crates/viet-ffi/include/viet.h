@@ -4,7 +4,9 @@
  * Contract (docs/SPEC-engine-core.md §2.2):
  *  - Strings are borrowed from the engine and are valid only until the next
  *    viet_engine_feed() call on the same engine.
- *  - Strings are length-delimited and NUL-terminated; never rely on the NUL.
+ *  - Strings are length-delimited in **bytes** of UTF-8 and are **not** NUL-terminated:
+ *    read commit_length bytes, and do not call strlen(). A length of zero means the
+ *    pointer must not be dereferenced.
  *  - No allocation or ownership crosses this boundary.
  *  - A panic inside the engine is caught and reported as a no-op action.
  */
@@ -37,12 +39,12 @@ typedef struct {
 } viet_input_t;
 
 typedef struct {
-  int32_t  consumed;
-  uint16_t backspaces;
-  uint32_t commit_length;
-  uint32_t preedit_length;
-  int32_t  boundary;
-  uint32_t reserved_flags; /* must be 0 in v1 */
+  int32_t  consumed;      /* 1 = the key must not be forwarded */
+  uint16_t backspaces;    /* characters (not bytes) to delete before committing */
+  uint32_t commit_length; /* bytes of UTF-8 in the commit span */
+  uint32_t preedit_length;/* bytes of UTF-8; always 0 in v1, there is no buffer */
+  int32_t  boundary;      /* 1 = a word just ended */
+  uint32_t reserved_flags;/* must be 0 in v1 */
 } viet_action_t;
 
 viet_engine_t *viet_engine_new(const viet_config_t *configuration);

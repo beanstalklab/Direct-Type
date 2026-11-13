@@ -110,6 +110,22 @@ void viet_engine_feed(viet_engine_t *engine, const viet_input_t *input,
 
 Rules: `extern "C"`, `#[no_mangle]`, no unwind across the boundary (`catch_unwind` at the edge, return a safe no-op action), no ownership transfer, no callbacks.
 
+Spans and counts, in the detail T3.1 pinned down:
+
+- `commit` and `preedit` are borrowed from engine memory, valid until the next
+  `viet_engine_feed` on the same engine. They are **length-delimited in bytes** of UTF-8
+  and are **not NUL-terminated**: a C caller reads `commit_length` bytes and never calls
+  `strlen`. A length of zero means the pointer must not be dereferenced, and a NULL output
+  pointer is allowed.
+- `backspaces` counts **characters**, not bytes, because `ệ` is three bytes of UTF-8. A
+  frontend that deleted `backspaces` bytes would corrupt its buffer; the C smoke test's
+  `delete_characters` helper is the reference implementation of the right thing.
+- A NULL engine, a NULL `out_action` or an unknown `kind` is a no-op action rather than a
+  crash, so a frontend that has already torn its engine down can keep calling.
+- `viet.h` and the Rust implementation are checked against each other from C, not only
+  from Rust: `scripts/c_smoke_test.sh` links `tests/smoke.c` against `libviet.a` **and**
+  `libviet.so`, having verified that the shared library exports every declared symbol.
+
 ## 3. Engine behaviour (the part that must be right)
 
 ### 3.1 Input classification
@@ -406,6 +422,7 @@ crates/viet-cli/src/corpus.rs   corpus runner behind `viet-cli check`
 crates/viet-ffi/
   src/lib.rs
   include/viet.h
+  tests/smoke.c                 C caller: header and implementation agree
 tests/corpus/telex-new.tsv       passthrough cases
 tests/corpus/telex-letters.tsv   letter modifiers
 tests/corpus/telex-tone.tsv      tone keys, new tone style
@@ -418,6 +435,8 @@ tests/corpus/vni-old.tsv         VNI with old tone placement
 tests/corpus/simple-telex-new.tsv  Simple Telex: circumflex, stroke, `w` for `ư`, tones
 scripts/verify_unicode_table.py Python 3 stdlib: checks every table entry against Unicode
                                 canonical decomposition; CI runs it
+scripts/c_smoke_test.sh         builds both library artifacts, compiles the C smoke test
+                                against each, and runs it; CI runs it
 scripts/corpus_tool.py          planned; Python 3.14 stdlib only: sort, dedupe, validate TSV
 ```
 
@@ -476,6 +495,7 @@ Conventions: `snake_case`, `CamelCase` types, no `unwrap`/`expect`/`panic!` outs
 | Unit | `#[cfg(test)]` per module | parser, tone-index, spelling-inventory and restore-guard edge cases in isolation |
 | Property | `tests/invariants.rs` | every configuration: no panic on arbitrary input, `reset` is total, a consumed key commits precomposed text, a boundary is forwarded, no delete reaches past the word |
 | NFC oracle | `scripts/verify_unicode_table.py` | the closed table is real Unicode: every spelling is precomposed and decomposes to its base, quality mark and tone |
+| C ABI | `scripts/c_smoke_test.sh` | `viet.h` and the implementation agree from a non-Rust caller, linked both ways; every symbol is exported; a panic is contained |
 | Fuzz | `fuzz/` | crash/hang resistance, run manually before releases |
 | Bench | `benches/` | p99 keystroke latency < 1 ms (target: < 10 µs) |
 

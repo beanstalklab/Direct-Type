@@ -23,7 +23,8 @@ Pre-alpha. What exists today:
   `dd` and the Telex tones).
 - `crates/viet-cli` — `viet-cli type` and `viet-cli check` (golden-corpus runner,
   exit codes `0`/`1`/`2`).
-- `crates/viet-ffi` — a C ABI over the engine, with panics contained at the boundary.
+- `crates/viet-ffi` — a C ABI over the engine, with panics contained at the boundary;
+  `crates/viet-ffi/tests/smoke.c` is a C caller linked against both library artifacts.
 - 630 corpus cases and CI that runs formatting, lint, tests and the corpus.
 
 There is no fcitx5 addon, no installer, and nothing to install yet.
@@ -36,6 +37,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 cargo run -p viet-cli -- check tests/corpus
 python3 scripts/verify_unicode_table.py    # the table against Unicode
+bash scripts/c_smoke_test.sh               # the C ABI, from C
 ```
 
 Type through the engine without any GUI:

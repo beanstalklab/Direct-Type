@@ -76,7 +76,7 @@ When SOLID conflicts with clarity, prefer clarity and say why in the change.
 
 ## Verification
 
-Current phase: **T2.3 (benchmarks and allocation check)**. The commands below are the only accepted
+Current phase: **Phase 3 done — the fcitx5 addon (T0.2) is the next build step**. The commands below are the only accepted
 verification; run them from the repository root. Do not substitute different
 commands, and do not lower a check to get to green.
 
@@ -163,9 +163,16 @@ commands, and do not lower a check to get to green.
   `unsafe` outside `viet-ffi` (spec D8, §8 amended). Mutation-checked: a one-line
   allocation per keystroke fails it with 14,100 allocations.
 - Still blocked on approval: the `cargo-fuzz` target and the `criterion` p99 benchmark.
-- Next product question, not a task: nothing is installable yet. `viet-cli` prints text;
-  there is no fcitx5 addon, no installer, no toggle key and no tray. Phase 3 (T3.1 C ABI
-  verified, T3.2 C smoke test) plus the addon in T0.2 is what makes it an input method.
+- **T3.1 and T3.2 done**: the C ABI is verified from C, not only from Rust.
+  `crates/viet-ffi/tests/smoke.c` is compiled with `-std=c11 -Wall -Wextra -Werror` and
+  linked against `libviet.a` and `libviet.so` by `scripts/c_smoke_test.sh`, which also
+  checks that the four functions are exported; CI runs it. The header's false NUL claim is
+  fixed (spans are length-delimited in bytes), and a `#[cfg(test)]`-only injection proves a
+  panic inside the feed is contained. The C test also found that `backspaces` counts
+  characters, not bytes — `delete_characters` in `smoke.c` is the reference for the addon.
+  Checkpoint F is met.
+- Nothing is installable yet: no fcitx5 addon, no installer, no toggle key, no tray. T0.2
+  (the C++ addon on this ABI) is the next build step; the installer and toggle follow.
 - `test` → `tét` stays `tét`: `tét` is real Vietnamese (`nét`, `mét`, `sét` share its
   rhyme), so no spelling rule may rewrite it. English typing needs the toggle key, or
   `free_tone_mark` off. Do not "fix" this by weakening the tables; the corpus case
