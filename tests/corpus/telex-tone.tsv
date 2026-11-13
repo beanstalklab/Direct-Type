@@ -88,9 +88,11 @@ ddoongj	động
 ddieeuf	điều
 ddieeus	điếu
 ddieeuj	điệu
-uows	ướ
-uowf	ườ
-uowj	ượ
+# A word that ends at the `w` keeps the `uơ` rhyme, so the mark lands on its only
+# quality vowel.
+uows	uớ
+uowf	uờ
+uowj	uợ
 #
 # §3.4 rule 2: a closed syllable marks its last nucleus vowel, whatever the style.
 toans	toán

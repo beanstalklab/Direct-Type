@@ -134,7 +134,9 @@ cargo run -p viet-cli -- check tests/corpus
 - [x] Corpus runner honours `backspaces`, so a case can express a rewrite of an earlier character
 
 **Decisions recorded in this task:** `w` after `o` horns both letters of the `uo`
-pair (`uow → ươ`), because `ươ` is unreachable in one keystroke otherwise; `[` and
+pair while the word goes on (`uowng → ương`), because `ương` is unreachable in one
+keystroke otherwise, while a word that ends at the `w` keeps `uơ` (`thuow → thuơ`, so
+`thuở`, `quơ` and `huơ` stay spellable — corrected in T1.7, see below); `[` and
 `]` insert `ơ`/`ư` directly and do not modify a preceding letter; a letter carrying
 a different mark keeps it and the key stays literal (`awa → ăa`). Spec §3.2 and the
 corpus naming convention in §5 were updated in the same change.

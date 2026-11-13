@@ -89,7 +89,7 @@ commands, and do not lower a check to get to green.
 - **T1.1 done**: characters commit immediately (no preedit), `viet-cli type` and
   `viet-cli check` work with exit codes `0/1/2`, and CI runs the corpus check.
 - **T1.2 done**: Telex letter modifiers (`aa/ee/oo`, `w`, `aw/ow/uw`, `dd`, `[`, `]`,
-  `uow → ươ`) with doubling to undo; a modifier reports `backspaces` and rewrites
+  `uowng → ương`, `uow → uơ`) with doubling to undo; a modifier reports `backspaces` and rewrites
   text the application already shows.
 - **T1.3 done**: `syllable::parse` (onset/nucleus/coda, `qu` and `gi` as onsets,
   fixed-array so it never allocates) and `tone::tone_index` (quality diacritic, coda,

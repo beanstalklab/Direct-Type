@@ -25,10 +25,16 @@ DDD	DD
 ]	ư
 [[	[
 #
-# `w` after `o` horns both letters of the `uo` pair, because one keystroke has to
-# reach `ươ`; the undo restores both letters.
-uow	ươ
-duow	dươ
+# `w` after `o` horns the `o`, and the `u` in front of it while the word goes on, so
+# `ương` is one keystroke away. A word that ends at the `w` keeps `uơ`: `thuở`, `quơ`
+# and `huơ` are spelled with that rhyme, and without this they would be unreachable.
+uow	uơ
+duow	duơ
+thuow	thuơ
+thuowr	thuở
+huow	huơ
+quow	quơ
+uowng	ương
 uoww	uow
 uwow	ươ
 #

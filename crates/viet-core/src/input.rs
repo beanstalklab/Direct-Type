@@ -32,7 +32,12 @@ pub(crate) trait RulePack {
 
     /// Apply `key` to the trailing letter of `output` and report how the trailing
     /// letter now came about.
-    fn append(output: &mut String, key: char, origin: Origin) -> Origin;
+    ///
+    /// `more_letters_follow` says whether another letter key is still to come in this
+    /// word. Only the `uo` pair needs it: `uowng` is `ương`, while a word that ends at
+    /// the `w` keeps `uơ` (`thuow → thuơ`), because `thuở`, `quơ` and `huơ` are the
+    /// only words with that rhyme.
+    fn append(output: &mut String, key: char, origin: Origin, more_letters_follow: bool) -> Origin;
 }
 
 /// Where the trailing letter of the transformed word came from.
@@ -107,7 +112,8 @@ fn fold<R: RulePack>(
             origin = Origin::Literal;
             continue;
         }
-        origin = R::append(output, key, origin);
+        let more_letters_follow = last_letter_position.is_some_and(|last| position < last);
+        origin = R::append(output, key, origin, more_letters_follow);
         previous_tone_key = None;
     }
 
@@ -260,12 +266,20 @@ pub(crate) fn mark_trailing(
     })
 }
 
-/// `w` or `7` after `o`: horn the `o` and the `u` in front of it.
+/// `w` or `7` after `o`: horn the `o`, and the `u` in front of it when the syllable
+/// goes on.
 ///
-/// `ươ` is otherwise unreachable in one keystroke, and every Telex user types that
-/// diphthong as `uow`, every VNI user as `uo7`. Undoing restores both letters, so
+/// `ương` needs one keystroke, so a `u` in front of the horned `o` is horned too while
+/// another letter is still coming (`uowng → ương`). A word that ends at the horn key
+/// keeps `uơ` (`thuow → thuơ`, `huow → huơ`, `quow → quơ`), because that is the only
+/// rhyme `thuở` and `quơ` have. Undoing restores whatever the keystroke marked, so
 /// `uoww` is `uow` and `uo77` is `uo7`.
-pub(crate) fn horn_u_o_pair(output: &mut String, key: char, origin: Origin) -> Option<Origin> {
+pub(crate) fn horn_u_o_pair(
+    output: &mut String,
+    key: char,
+    origin: Origin,
+    also_horn_u: bool,
+) -> Option<Origin> {
     if matches!(
         origin,
         Origin::Marked {
@@ -281,12 +295,14 @@ pub(crate) fn horn_u_o_pair(output: &mut String, key: char, origin: Origin) -> O
     output.pop();
 
     let mut also_horned_u = false;
-    if let Some(before_o) = output.chars().next_back() {
-        if base_letter(before_o).eq_ignore_ascii_case(&'u') {
-            if let Some(horned_u) = compose(before_o, LetterMark::Horn) {
-                output.pop();
-                output.push(horned_u);
-                also_horned_u = true;
+    if also_horn_u {
+        if let Some(before_o) = output.chars().next_back() {
+            if base_letter(before_o).eq_ignore_ascii_case(&'u') {
+                if let Some(horned_u) = compose(before_o, LetterMark::Horn) {
+                    output.pop();
+                    output.push(horned_u);
+                    also_horned_u = true;
+                }
             }
         }
     }

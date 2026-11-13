@@ -237,9 +237,9 @@ impl Engine {
             Method::Telex => {
                 input::apply::<telex::Telex>(&self.raw_keys, &self.config, &mut self.scratch)
             }
-            // Simple Telex has a narrower modifier set (T1.8) and reach the
-            // application unchanged rather than half-transformed by the wrong rule
-            // pack.
+            // Simple Telex has a narrower modifier set (T1.8) and VNI its own keys
+            // (T1.7); until those land, their words reach the application unchanged
+            // rather than half-transformed by the wrong rule pack.
             Method::SimpleTelex | Method::Vni => {
                 self.scratch.clear();
                 self.scratch.push_str(&self.raw_keys);

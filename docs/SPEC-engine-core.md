@@ -145,7 +145,11 @@ Tone keys in Telex, in the detail T1.4 pinned down:
 Letter modifiers in Telex, in the detail T1.2 pinned down:
 
 - Doubling undoes the modifier and keeps the key literal: `aaa → aa`, `ddd → dd`, `ww → w`, `uoww → uow`. The letter that survives keeps the case already on screen (§3.7).
-- `w` after `o` horns both letters of the `uo` pair, because one keystroke has to reach `ươ`: `uow → ươ`, `uwow → ươ`.
+- `w` after `o` horns the `o`, and the `u` in front of it while another letter is still
+  coming, because one keystroke has to reach `ương`: `uowng → ương`, `uwow → ươ`. A word
+  that ends at the `w` keeps the `uơ` rhyme (`uow → uơ`, `thuow → thuơ`), which is the
+  only spelling `thuở`, `quơ` and `huơ` have — an eager pair would make those words
+  unreachable, and §3.6 lists `uơ` as a nucleus for exactly that reason.
 - `[` and `]` insert `ơ` and `ư` themselves; they are listed as letters above, not as a modification of a preceding letter (`a[` is `aơ`, not `ă`).
   With `auto_restore` on — the default — a word that only reaches an invalid
   spelling this way is given back at the boundary (`a[` → `a[`), which is §3.5.

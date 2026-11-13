@@ -36,19 +36,24 @@ impl RulePack for Telex {
     /// `as`, not `a`.
     const RESTORES_TONE_KEY_LETTER: bool = true;
 
-    fn append(output: &mut String, key: char, origin: Origin) -> Origin {
-        append_letter(output, key, origin)
+    fn append(output: &mut String, key: char, origin: Origin, more_letters_follow: bool) -> Origin {
+        append_letter(output, key, origin, more_letters_follow)
     }
 }
 
 /// Apply one letter keystroke and report how the trailing letter now came about.
-fn append_letter(output: &mut String, key: char, origin: Origin) -> Origin {
+fn append_letter(
+    output: &mut String,
+    key: char,
+    origin: Origin,
+    more_letters_follow: bool,
+) -> Origin {
     match key {
         // `[` and `]` are letters in their own right: §3.2 lists them as `ơ` and
         // `ư`, never as a change to a preceding letter, unlike `aw → ă`.
         '[' | ']' => append_bracket(output, key, origin),
         _ => match key.to_ascii_lowercase() {
-            'w' => append_w(output, key, origin),
+            'w' => append_w(output, key, origin, more_letters_follow),
             'a' | 'e' | 'o' => append_circumflex(output, key, origin),
             'd' => append_stroke(output, key, origin),
             _ => append_literal(output, key),
@@ -86,8 +91,8 @@ fn append_stroke(output: &mut String, key: char, origin: Origin) -> Origin {
     }
 }
 
-/// `w → ư`, `aw → ă`, `uw → ư`, `ow → ơ`, and `uow → ươ`.
-fn append_w(output: &mut String, key: char, origin: Origin) -> Origin {
+/// `w → ư`, `aw → ă`, `uw → ư`, `ow → ơ`, `uow → uơ`, and `uowng → ương`.
+fn append_w(output: &mut String, key: char, origin: Origin, more_letters_follow: bool) -> Origin {
     // `ww → w`: a second `w` cancels the letter the first one produced. The letter
     // that stays is the one already on screen, case included, because an undo must not
     // also change what the user sees (`Ww → W`, not `w`).
@@ -107,7 +112,7 @@ fn append_w(output: &mut String, key: char, origin: Origin) -> Origin {
     let applied = match base_letter(previous).to_ascii_lowercase() {
         'a' => mark_trailing(output, LetterMark::Breve, key, origin),
         'u' => mark_trailing(output, LetterMark::Horn, key, origin),
-        'o' => horn_u_o_pair(output, key, origin),
+        'o' => horn_u_o_pair(output, key, origin, more_letters_follow),
         // After a consonant, `w` is a letter of its own.
         _ => {
             output.push(horned_u_with_case(key));
@@ -212,11 +217,21 @@ mod tests {
     }
 
     #[test]
-    fn horn_covers_both_letters_of_the_uo_pair() {
-        assert_eq!(transform("uow"), "ươ");
-        assert_eq!(transform("uwow"), "ươ");
-        assert_eq!(transform("uoww"), "uow");
+    fn horn_covers_both_letters_of_the_uo_pair_when_the_word_goes_on() {
+        // `ương` has to be reachable in one keystroke…
+        assert_eq!(transform("uowng"), "ương");
         assert_eq!(transform("dduowng"), "đương");
+        assert_eq!(transform("uwow"), "ươ");
+        // …while a word that ends at the `w` keeps `uơ`, which is the rhyme of
+        // `thuở`, `quơ` and `huơ`.
+        assert_eq!(transform("uow"), "uơ");
+        assert_eq!(transform("thuow"), "thuơ");
+        assert_eq!(transform("thuowr"), "thuở");
+        assert_eq!(transform("huow"), "huơ");
+        assert_eq!(transform("quow"), "quơ");
+        // Undoing puts back whatever the keystroke marked. The second `w` is itself a
+        // letter, so the first one horns both and the undo restores both.
+        assert_eq!(transform("uoww"), "uow");
     }
 
     #[test]
