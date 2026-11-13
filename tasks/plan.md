@@ -53,7 +53,7 @@ Each task ends with something you can type into and observe via `viet-cli`.
 
 ### Phase 2 — Robustness
 
-- [ ] **T2.1 Backspace and mid-composition editing**
+- [x] **T2.1 Backspace and mid-composition editing**
 - [ ] **T2.2 Property tests + fuzz target**
 - [ ] **T2.3 Benchmarks and allocation check**
 

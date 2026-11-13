@@ -76,7 +76,7 @@ When SOLID conflicts with clarity, prefer clarity and say why in the change.
 
 ## Verification
 
-Current phase: **Phase 1 done, T2.1 next (backspace and mid-composition editing)**. The commands below are the only accepted
+Current phase: **T2.2 (property tests and fuzz target)**. The commands below are the only accepted
 verification; run them from the repository root. Do not substitute different
 commands, and do not lower a check to get to green.
 
@@ -133,9 +133,16 @@ commands, and do not lower a check to get to green.
   well. 52 corpus cases in `simple-telex-new.tsv`, 630 in total; 81 core tests.
 - All three methods (Telex, VNI, Simple Telex) now share one fold in `src/input.rs`;
   `tone.rs` has not changed since Checkpoint C.
-- Next: T2.1 — backspace and mid-composition editing. `Input::Backspace` already
-  re-derives the word from the raw keys; what T2.1 owes is the corpus coverage and the
-  edge cases around a boundary that already restored a word.
+- **T2.1 done**: backspace needed no engine change — it already deleted a raw key and
+  re-derived the word — so the task added the guarantee: every prefix of every corpus
+  case, deleted and finished, must equal the shorter prefix typed and finished (about
+  two thousand prefixes per run); a random property that a word with deletes ends where
+  its surviving keys would; and unit tests for the forwarded backspace after a normal
+  and after a restored boundary, for a delete that brings a tone back (`asz → as` →
+  `á`), and for `spell_check` re-applying to the shorter word. 88 core tests, 5 CLI
+  integration tests.
+- Next: T2.2 — property tests and a fuzz target: no panic on arbitrary input, `reset`
+  total, NFC output, plus the word-length cap the raw-key buffer still lacks.
 - `test` → `tét` stays `tét`: `tét` is real Vietnamese (`nét`, `mét`, `sét` share its
   rhyme), so no spelling rule may rewrite it. English typing needs the toggle key, or
   `free_tone_mark` off. Do not "fix" this by weakening the tables; the corpus case

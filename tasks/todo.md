@@ -440,10 +440,31 @@ cargo run -p viet-cli -- check tests/corpus
 **Description:** Backspace removes the last *raw* key and re-derives the transformed word from scratch. Word boundary on backspace-at-empty-buffer is defined explicitly.
 
 **Acceptance criteria:**
-- [ ] Every prefix of every corpus case, followed by Backspace at the end, yields the corpus expectation of that prefix
-- [ ] Backspace on empty buffer returns `consumed: false`
-- [ ] Backspace after commit does not recall the previous word
-- [ ] Property test: for random input + backspaces, final state equals the engine state of the surviving raw sequence
+- [x] Every prefix of every corpus case, followed by Backspace at the end, yields the corpus expectation of that prefix
+- [x] Backspace on empty buffer returns `consumed: false`
+- [x] Backspace after commit does not recall the previous word
+- [x] Property test: for random input + backspaces, final state equals the engine state of the surviving raw sequence
+
+**Decisions recorded in this task:**
+
+- No engine change was needed: `Input::Backspace` already popped the raw key and
+  re-derived the whole word, which is why it can undo a modifier that shaped an earlier
+  letter and can bring a removed tone back. T2.1 is the guarantee, in two properties and
+  seven unit tests.
+- "Every prefix of every corpus case" is implemented as: type the prefix, delete, end the
+  word, and compare with typing the shorter prefix and ending the word. Ending both keeps
+  `auto_restore` comparable — a prefix that ends on a space has already finished its word
+  and been restored, and comparing that against a live shorter word would compare a
+  finished word with an unfinished one.
+- A forwarded backspace is the application's, not the engine's: the test helper models the
+  frontend deleting the character before the caret, which is what a real frontend does and
+  what makes a delete after a boundary observable at all.
+- The property was checked against a deliberate mutation (forgetting to re-derive after
+  the pop) and failed on `aa`, so it is not a test that passes for free.
+- `crates/viet-core/src/buffer.rs` from the task's file list was not created: the raw keys
+  are one `String` inside `Engine`, and wrapping it in a module would add a layer with no
+  second reason to change. Where the buffer needs a policy — a cap on word length for
+  T2.2 — that belongs in the engine next to the other state, not in a wrapper.
 
 **Verification:**
 ```bash
@@ -452,7 +473,7 @@ cargo test --workspace
 ```
 
 **Dependencies:** T1.8
-**Files:** `crates/viet-core/src/buffer.rs`, `crates/viet-core/src/lib.rs`, `crates/viet-core/tests/invariants.rs`
+**Files:** `crates/viet-core/src/lib.rs`, `crates/viet-cli/tests/corpus.rs`
 **Scope:** M
 
 ---

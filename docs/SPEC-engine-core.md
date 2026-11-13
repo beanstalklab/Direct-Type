@@ -234,7 +234,17 @@ Every rule above must be backed by at least three corpus cases, including a coun
 - Word boundary: commit the transformed buffer, clear state, `boundary = true`.
 - Backspace during composition removes the last *raw* key, then re-derives the
   transformation from scratch. This is why the engine keeps the raw key sequence
-  alongside the transformed text.
+  alongside the transformed text: a delete has to be able to undo what a modifier did to
+  an earlier letter (`dduowng` → `đương`, delete the `g` → `đươn`), and a delete can
+  bring a removed tone back (`asz` → `as`, delete the `s` → `á`).
+- Backspace with no word in progress is forwarded (`consumed: false`), because the
+  character before the caret belongs to the application — a space, a word from another
+  keyboard, or a word this engine already gave back. That covers a word that ended
+  normally and one that `auto_restore` rewrote: after either, the engine has no word, so
+  a delete never recalls it.
+- `spell_check` is re-applied after a delete, because the shorter word may be spellable
+  again: `aaa` stays `aaa` while it cannot become a syllable, and one delete later `aa`
+  is `â`.
 
 `auto_restore` (default on) is decided at the boundary, because that is the first
 moment the word is known to be finished:
@@ -458,6 +468,11 @@ Conventions: `snake_case`, `CamelCase` types, no `unwrap`/`expect`/`panic!` outs
 | Property | `tests/invariants.rs` | no panic on arbitrary char streams; `reset` is total; output is always NFC |
 | Fuzz | `fuzz/` | crash/hang resistance, run manually before releases |
 | Bench | `benches/` | p99 keystroke latency < 1 ms (target: < 10 µs) |
+
+Deleting a key is a property over the whole corpus, not a case list:
+`crates/viet-cli/tests/corpus.rs` types every prefix of every corpus case, deletes the
+last key, and requires the same text as typing the shorter prefix. Roughly two thousand
+prefixes per run, so a modifier that only looks right when the word grows cannot hide.
 
 Case is a property too: `crates/viet-cli/tests/corpus.rs` derives the upper-case and
 Title-case twin of every corpus case and requires the output to be the twin of the

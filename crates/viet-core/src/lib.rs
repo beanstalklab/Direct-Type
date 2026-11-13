@@ -754,11 +754,13 @@ mod tests {
             self.0 >> 33
         }
 
+        fn next_character(&mut self) -> char {
+            Self::ALPHABET[self.next_number() as usize % Self::ALPHABET.len()]
+        }
+
         fn next_word(&mut self) -> String {
             let length = self.next_number() as usize % 8 + 1;
-            (0..length)
-                .map(|_| Self::ALPHABET[self.next_number() as usize % Self::ALPHABET.len()])
-                .collect()
+            (0..length).map(|_| self.next_character()).collect()
         }
     }
 
@@ -818,7 +820,119 @@ mod tests {
     #[test]
     fn backspace_on_an_empty_word_is_forwarded() {
         let mut engine = engine();
+        let action = engine.feed(Input::Backspace);
+        assert!(!action.consumed);
+        assert_eq!(action, Action::none());
+    }
+
+    #[test]
+    fn backspace_after_a_boundary_does_not_recall_the_word() {
+        let mut engine = engine();
+        assert_eq!(finished_text(&mut engine, "vieejt"), "việt");
+        // The word is over, so the key belongs to the application: it deletes whatever
+        // came before the next word, and the engine must not rewrite that text.
+        let action = engine.feed(Input::Backspace);
+        assert!(!action.consumed);
+        assert_eq!(action, Action::none());
+        assert_eq!(typed_text(&mut engine, "a"), "a");
+    }
+
+    #[test]
+    fn backspace_after_a_restored_word_does_not_recall_it() {
+        let mut engine = engine();
+        assert_eq!(finished_text(&mut engine, "asd"), "asd");
         assert_eq!(engine.feed(Input::Backspace), Action::none());
+        assert_eq!(typed_text(&mut engine, "a"), "a");
+    }
+
+    #[test]
+    fn backspace_removes_a_keystroke_not_a_transformed_character() {
+        // Deleting the `s` of `aas` takes the tone off `ấ` and leaves `â`, because the
+        // raw keys are `aa` again. A backspace that deleted a character of the shown
+        // text would leave `ấ` minus its last letter.
+        let mut engine = engine();
+        assert_eq!(typed_text(&mut engine, "aas"), "ấ");
+        let action = engine.feed(Input::Backspace);
+        assert!(action.consumed);
+        assert_eq!(action.backspaces, 1);
+        assert_eq!(action.commit, "â");
+    }
+
+    #[test]
+    fn backspace_can_bring_a_removed_tone_back() {
+        // `asz` removes the tone and keeps the `s`; deleting that `s` is `as`, which is
+        // `á` again.
+        let mut engine = engine();
+        assert_eq!(typed_text(&mut engine, "asz"), "as");
+        let action = engine.feed(Input::Backspace);
+        assert_eq!(action.backspaces, 2);
+        assert_eq!(action.commit, "á");
+    }
+
+    #[test]
+    fn backspace_undoes_a_modifier_that_shaped_earlier_letters() {
+        // `dduowng` is `đương`; the `w` horned two letters, so deleting the `g` has to
+        // re-derive from `dduowng` minus `g` rather than edit the shown text. A tone
+        // typed afterwards lands on the shorter word.
+        let mut engine = engine();
+        let mut text = String::new();
+        for key in "dduowng".chars() {
+            perform(&mut text, engine.feed(Input::Char(key)));
+        }
+        assert_eq!(text, "đương");
+        perform(&mut text, engine.feed(Input::Backspace));
+        assert_eq!(text, "đươn");
+        perform(&mut text, engine.feed(Input::Char('f')));
+        assert_eq!(text, "đườn");
+    }
+
+    #[test]
+    fn backspace_re_derives_under_spell_check_too() {
+        // `aaa` cannot become a syllable, so `spell_check` leaves it as typed. One
+        // delete later the word is `aa`, which is a syllable again, and the engine
+        // transforms it without being asked twice.
+        let mut engine = Engine::new(Config {
+            spell_check: true,
+            ..Config::default()
+        });
+        let mut text = String::new();
+        for key in "aaa".chars() {
+            perform(&mut text, engine.feed(Input::Char(key)));
+        }
+        assert_eq!(text, "aaa");
+        perform(&mut text, engine.feed(Input::Backspace));
+        assert_eq!(text, "â");
+    }
+
+    #[test]
+    fn backspaces_leave_the_state_of_the_surviving_keys() {
+        // A word typed with deletes in the middle must end up exactly where the
+        // surviving keystrokes would have ended, and the raw buffer must say so.
+        let mut keys = Keys(0xbadc0de);
+        for _ in 0..500 {
+            let mut engine = engine();
+            let mut typed = String::new();
+            let mut surviving = String::new();
+            let mut text = String::new();
+            for _ in 0..keys.next_number() as usize % 10 + 1 {
+                if keys.next_number() % 3 == 0 {
+                    perform(&mut text, engine.feed(Input::Backspace));
+                    surviving.pop();
+                } else {
+                    let key = keys.next_character();
+                    perform(&mut text, engine.feed(Input::Char(key)));
+                    typed.push(key);
+                    surviving.push(key);
+                }
+            }
+            let mut fresh = Engine::new(Config::default());
+            assert_eq!(
+                text,
+                typed_text(&mut fresh, &surviving),
+                "surviving keys of {typed:?}"
+            );
+            assert_eq!(engine.raw_keys, surviving);
+        }
     }
 
     #[test]
