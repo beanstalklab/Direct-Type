@@ -423,6 +423,12 @@ crates/viet-ffi/
   src/lib.rs
   include/viet.h
   tests/smoke.c                 C caller: header and implementation agree
+addon/
+  CMakeLists.txt                fcitx5 module + metadata, no fcitx5_addon() helper in 5.1.7
+  src/addon.cpp                 the factory fcitx5 looks up: fcitx_addon_factory_instance
+  src/engine.h, src/engine.cpp  InputMethodEngine: input method list, key handling
+  directtype.conf.in            addon metadata (Type=SharedLibrary, Category=InputMethod)
+  tests/load_check.cpp          dlopens the built module and drives the factory
 tests/corpus/telex-new.tsv       passthrough cases
 tests/corpus/telex-letters.tsv   letter modifiers
 tests/corpus/telex-tone.tsv      tone keys, new tone style

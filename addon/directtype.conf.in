@@ -1,0 +1,17 @@
+# Addon metadata. fcitx5 reads this file to know that
+# <addon dir>/directtype.so is an input method engine and what it provides.
+[Addon]
+Name=Direct Type
+Comment=Direct typing for Vietnamese: keystrokes reach the application immediately
+Category=InputMethod
+Version=@PROJECT_VERSION@
+Type=SharedLibrary
+Library=directtype
+# False because the input methods are listed by the engine itself, not by files under
+# share/fcitx5/inputmethod/ - see listInputMethods() in src/engine.cpp.
+OnDemand=False
+# No configuration yet; T4.4 turns this on together with the config UI.
+Configurable=False
+
+[Addon/Dependencies]
+0=core

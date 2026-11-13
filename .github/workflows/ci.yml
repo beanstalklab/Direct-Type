@@ -5,6 +5,25 @@ on:
   pull_request:
 
 jobs:
+  addon:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install fcitx5 headers and a C++ compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libfcitx5core-dev g++ cmake
+
+      - name: Configure
+        run: cmake -S addon -B addon/build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build addon/build
+
+      - name: Check that the addon loads
+        run: ctest --test-dir addon/build --output-on-failure
+
   verify:
     runs-on: ubuntu-24.04
     steps:

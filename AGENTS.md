@@ -76,7 +76,7 @@ When SOLID conflicts with clarity, prefer clarity and say why in the change.
 
 ## Verification
 
-Current phase: **Phase 4 — `ime-addon` (T4.1–T4.6), plan written and awaiting approval**. The commands below are the only accepted
+Current phase: **Phase 4 — `ime-addon`, T4.1 done, T4.2 (direct typing) next**. The commands below are the only accepted
 verification; run them from the repository root. Do not substitute different
 commands, and do not lower a check to get to green.
 
@@ -171,11 +171,24 @@ commands, and do not lower a check to get to green.
   panic inside the feed is contained. The C test also found that `backspaces` counts
   characters, not bytes — `delete_characters` in `smoke.c` is the reference for the addon.
   Checkpoint F is met.
-- Nothing is installable yet: no fcitx5 addon, no installer, no toggle key, no tray.
-  The addon work is broken down in `tasks/todo.md` T4.1–T4.6 and `tasks/plan.md` Phase 4:
-  addon that loads, direct typing through the C ABI, language toggle, configuration, status
-  indicator, one-command install. fcitx5 5.1.7 has no `fcitx5_addon()` CMake macro, so the
-  targets are declared by hand — read the addon template before writing `CMakeLists.txt`.
+- **T4.1 done**: `addon/` builds `directtype.so` with CMake, installs it plus
+  `directtype.conf` into fcitx5's addon and data directories, and exports
+  `fcitx_addon_factory_instance`. `addon/tests/load_check.cpp` is a CTest that dlopens the
+  built module, calls the factory and asserts the engine lists one Vietnamese input method
+  named `directtype`; CI builds and runs it. Every key is still forwarded unchanged, so
+  enabling it cannot break typing.
+- Facts pinned while building it, because guessing cost time in this phase: fcitx5 5.1.7's
+  CMake package has **no** `fcitx5_addon()` helper (declare the module and installs by
+  hand), the engine base class is `InputMethodEngine` (**not** `InputMethodEngineV2`, which
+  is not in 5.1.7), and `Fcitx5UtilsConfig.cmake` defaults the install dirs to
+  `${CMAKE_INSTALL_PREFIX}/lib/fcitx5` (`/usr/local/...`, a directory fcitx5 never reads)
+  unless `FCITX_INSTALL_USE_FCITX_SYS_PATHS=On`. `DIRECTTYPE_ADDON_DIR` and
+  `DIRECTTYPE_DATA_DIR` are the cache variables to override for a per-user install.
+- **The fcitx5 daemon is not installed on this machine** (only `libfcitx5core-dev` and the
+  frontends), so loading into a running session, `fcitx5-configtool` and typing in real
+  applications are human checks on a machine that has fcitx5.
+- Nothing is installable yet: no installer, no toggle key, no tray. Next is T4.2 — wire
+  `viet_engine_feed` into `keyEvent` and apply `backspaces` + `commit`.
 - `test` → `tét` stays `tét`: `tét` is real Vietnamese (`nét`, `mét`, `sét` share its
   rhyme), so no spelling rule may rewrite it. English typing needs the toggle key, or
   `free_tone_mark` off. Do not "fix" this by weakening the tables; the corpus case
@@ -193,12 +206,18 @@ commands, and do not lower a check to get to green.
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
+cmake -S addon -B addon/build -DCMAKE_BUILD_TYPE=Release
+cmake --build addon/build
+ctest --test-dir addon/build --output-on-failure
 cargo run -p viet-cli -- check tests/corpus     # exit 0/1/2
 cargo bench -p viet-core                        # from T2.3 onwards
 ```
 
-CI (`.github/workflows/ci.yml`) runs formatting, lint, tests, build and the corpus
-check on every push and PR. The benchmark joins CI at T2.3.
+CI (`.github/workflows/ci.yml`) runs formatting, lint, tests, build, the corpus check, the
+Unicode table check and the C ABI smoke test on every push and PR, plus one `addon` job
+that installs `libfcitx5core-dev` and builds and ctest's the addon. The benchmark is not
+in CI yet (T2.3 is blocked on `criterion`).
 
-Undefined until the relevant task exists: the C++ addon build (needs CMake + fcitx5
-headers, T0.2) and any installer test. Ask before inventing either.
+Undefined until the relevant task exists: the installer test (T4.6). Ask before
+inventing it. The addon build is defined: `addon/CMakeLists.txt`, CMake 3.16+, fcitx5
+5.1.7 headers, no `fcitx5_addon()` macro.

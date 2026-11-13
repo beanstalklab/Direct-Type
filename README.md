@@ -27,7 +27,9 @@ Pre-alpha. What exists today:
   `crates/viet-ffi/tests/smoke.c` is a C caller linked against both library artifacts.
 - 630 corpus cases and CI that runs formatting, lint, tests and the corpus.
 
-There is no fcitx5 addon, no installer, and nothing to install yet.
+The fcitx5 addon exists but does not type yet: it loads, offers one input method named
+"Direct Type", and forwards every key unchanged (T4.1). Wiring the engine in is T4.2, and
+the one-command install is T4.6 — so there is still nothing to install.
 
 ## Build and test
 
@@ -38,6 +40,10 @@ cargo test --workspace
 cargo run -p viet-cli -- check tests/corpus
 python3 scripts/verify_unicode_table.py    # the table against Unicode
 bash scripts/c_smoke_test.sh               # the C ABI, from C
+
+cmake -S addon -B addon/build -DCMAKE_BUILD_TYPE=Release
+cmake --build addon/build
+ctest --test-dir addon/build --output-on-failure   # the addon loads
 ```
 
 Type through the engine without any GUI:

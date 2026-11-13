@@ -74,7 +74,7 @@ Breakdown in `tasks/todo.md` T4.1–T4.6. Vertical slices: an addon that loads (
 direct typing through the C ABI (T4.2), then the language toggle (T4.3), configuration
 (T4.4), the status indicator (T4.5), and one-command install (T4.6).
 
-- [ ] **T4.1 Addon that loads**
+- [x] **T4.1 Addon that loads**
 - [ ] **T4.2 Direct typing through the C ABI**
 - [ ] **T4.3 Language toggle**
 - [ ] **T4.4 Configuration UI**

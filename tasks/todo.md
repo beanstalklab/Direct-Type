@@ -647,22 +647,49 @@ unchanged. This is the slice that proves the toolchain, the addon metadata and t
 loading path before any engine call is wired in.
 
 **Acceptance criteria:**
-- [ ] `cmake -S addon -B addon/build && cmake --build addon/build` produces the module
-- [ ] `cmake --install` places it under the prefix with its `directtype.conf` metadata
-- [ ] The addon registers one input method named for the product (unique name, no clash
-      with `fcitx5`'s own methods) and appears in `fcitx5-configtool`'s input method list
-- [ ] Every key is forwarded unchanged, so turning it on cannot break typing
+- [x] `cmake -S addon -B addon/build && cmake --build addon/build` produces the module
+- [x] `cmake --install` places it under the prefix with its `directtype.conf` metadata
+- [x] The module exports `fcitx_addon_factory_instance` and the factory builds an engine
+      that lists one Vietnamese input method named `directtype`
+- [x] Every key is forwarded unchanged, so turning it on cannot break typing
+- [ ] Appears in `fcitx5-configtool` and loads into a running fcitx5 — **human check**,
+      the daemon is not installed on this machine
+
+**Decisions recorded in this task:**
+
+- Three facts from the installed 5.1.7 headers, all of which the plan had guessed wrong or
+  left open: there is **no** `fcitx5_addon()` CMake macro (the module and both installs are
+  declared by hand), the engine base class is `InputMethodEngine`, not
+  `InputMethodEngineV2`, and `Fcitx5UtilsConfig.cmake` installs to
+  `${CMAKE_INSTALL_PREFIX}/lib/fcitx5` — `/usr/local/lib/fcitx5`, which fcitx5 never reads
+  — unless `FCITX_INSTALL_USE_FCITX_SYS_PATHS=On`. That last one is set in
+  `addon/CMakeLists.txt`, with `DIRECTTYPE_ADDON_DIR`/`DIRECTTYPE_DATA_DIR` as the
+  overrides T4.6 will use for a per-user install.
+- The addon is `Type=SharedLibrary`, `OnDemand=False` and lists its input method from
+  `listInputMethods()`. `OnDemand=True` would mean declaring input methods in files under
+  `share/fcitx5/inputmethod/`, which is the right shape only when an addon provides many.
+- Verification that needs no session is automated: `addon/tests/load_check.cpp` dlopens the
+  built module with `RTLD_NOW`, calls the factory, checks the instance is an
+  `InputMethodEngine`, and checks the single entry's unique name, language and addon name
+  (fcitx5 routes an entry back to an engine by that name, so a mismatch is a silent
+  no-op). Mutation-checked: pointing the entry at another addon fails it.
+- `-Wall -Wextra -Wpedantic -Werror` on our targets from the first C++ file, so the addon
+  starts at the same bar as the Rust side.
+- CI gained an `addon` job that installs `libfcitx5core-dev` and runs configure, build and
+  ctest, so the addon cannot rot while the engine changes.
 
 **Verification:**
 ```bash
-cmake -S addon -B addon/build && cmake --build addon/build
-ldd addon/build/directtype.so | grep -E 'fcitx|viet'
+cmake -S addon -B addon/build -DCMAKE_BUILD_TYPE=Release
+cmake --build addon/build
+ctest --test-dir addon/build --output-on-failure
 ```
-plus a human check that the engine shows up in `fcitx5-configtool`.
+plus a human check that fcitx5 lists the input method.
 
 **Dependencies:** T3.2
 **Files:** `addon/CMakeLists.txt`, `addon/src/addon.cpp`, `addon/src/engine.h`,
-`addon/src/engine.cpp`, `addon/directtype.conf.in`
+`addon/src/engine.cpp`, `addon/directtype.conf.in`, `addon/tests/load_check.cpp`,
+`.github/workflows/ci.yml`
 **Scope:** M
 
 ## T4.2 — Direct typing through the C ABI
