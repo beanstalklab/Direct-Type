@@ -14,6 +14,7 @@
 
 #![forbid(unsafe_code)]
 
+mod input;
 mod spelling;
 mod syllable;
 mod telex;
@@ -233,10 +234,12 @@ impl Engine {
     /// Put the transformation of the current word into `scratch`.
     fn transform_into_scratch(&mut self) {
         match self.config.method {
-            Method::Telex => telex::apply_telex(&self.raw_keys, &self.config, &mut self.scratch),
-            // Simple Telex has a narrower modifier set (T1.8) and VNI uses digit
-            // keys (T1.7). Until those land, their words reach the application
-            // unchanged rather than half-transformed by the wrong rule pack.
+            Method::Telex => {
+                input::apply::<telex::Telex>(&self.raw_keys, &self.config, &mut self.scratch)
+            }
+            // Simple Telex has a narrower modifier set (T1.8) and reach the
+            // application unchanged rather than half-transformed by the wrong rule
+            // pack.
             Method::SimpleTelex | Method::Vni => {
                 self.scratch.clear();
                 self.scratch.push_str(&self.raw_keys);
