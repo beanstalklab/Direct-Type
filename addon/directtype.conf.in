@@ -10,8 +10,8 @@ Library=directtype
 # False because the input methods are listed by the engine itself, not by files under
 # share/fcitx5/inputmethod/ - see listInputMethods() in src/engine.cpp.
 OnDemand=False
-# No configuration yet; T4.4 turns this on together with the config UI.
-Configurable=False
+# The settings come from getConfig(), so fcitx5 builds the config UI from them.
+Configurable=True
 
 [Addon/Dependencies]
 0=core

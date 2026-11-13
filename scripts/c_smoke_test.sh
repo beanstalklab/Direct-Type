@@ -22,7 +22,8 @@ for artifact in "$static_library" "$shared_library"; do
 done
 
 # Every function the header declares has to be reachable from a dynamic caller.
-for symbol in viet_engine_new viet_engine_free viet_engine_reset viet_engine_feed; do
+for symbol in viet_engine_new viet_engine_free viet_engine_reset viet_engine_set_config \
+              viet_engine_feed; do
   if ! nm -D "$shared_library" | grep -q " T ${symbol}$"; then
     echo "error: ${shared_library} does not export ${symbol}" >&2
     exit 1

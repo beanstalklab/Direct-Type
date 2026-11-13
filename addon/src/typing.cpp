@@ -37,6 +37,12 @@ void TypingSession::reset() {
     }
 }
 
+void TypingSession::setEngineConfiguration(const viet_config_t &configuration) {
+    if (engine_ != nullptr) {
+        viet_engine_set_config(engine_, &configuration);
+    }
+}
+
 void TypingSession::setVietnameseEnabled(bool enabled) {
     if (enabled == vietnameseEnabled_) {
         return;

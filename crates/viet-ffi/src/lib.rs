@@ -153,6 +153,36 @@ pub unsafe extern "C" fn viet_engine_reset(engine: *mut viet_engine) {
     (*engine).transform_engine.reset();
 }
 
+/// Apply a configuration at runtime.
+///
+/// The word in progress is dropped: a settings change is not a typing event, and the text on
+/// screen was derived with the previous rule pack. Passing NULL applies the default
+/// configuration, the same as `viet_engine_new(NULL)`.
+///
+/// # Safety
+/// `engine` must be NULL or a valid engine pointer; `configuration` must be NULL or point to
+/// a valid `viet_config_t`.
+#[no_mangle]
+pub unsafe extern "C" fn viet_engine_set_config(
+    engine: *mut viet_engine,
+    configuration: *const viet_config_t,
+) {
+    if engine.is_null() {
+        return;
+    }
+    let config = if configuration.is_null() {
+        Config::default()
+    } else {
+        // SAFETY: the caller guarantees provenance, as documented above.
+        decode_configuration(&*configuration)
+    };
+    let transform_engine = &mut (*engine).transform_engine;
+    let _ = catching_panic(|| {
+        transform_engine.set_config(config);
+        transform_engine.reset();
+    });
+}
+
 /// Feed one key event.
 ///
 /// On any invalid argument or internal panic, `out_action` is set to a no-op
@@ -399,6 +429,59 @@ mod tests {
             viet_engine_free(std::ptr::null_mut());
             viet_engine_free(engine);
         }
+    }
+
+    #[test]
+    fn a_configuration_can_be_applied_at_runtime() {
+        let telex = viet_config_t {
+            method: 0,
+            tone_style: 1,
+            auto_restore: 1,
+            spell_check: 0,
+            free_tone_mark: 1,
+        };
+        let vni = viet_config_t { method: 2, ..telex };
+
+        // SAFETY: the configuration is a valid struct and the pointer is freed once.
+        let engine = unsafe { viet_engine_new(&telex) };
+        assert_eq!(type_keys(engine, "vieejt"), "việt");
+
+        // The same engine, now speaking VNI. `vieejt` would be nonsense there, so the test
+        // types a VNI word instead.
+        // SAFETY: as above.
+        unsafe { viet_engine_set_config(engine, &vni) };
+        assert_eq!(type_keys(engine, "d9u7o7ng2"), "đường");
+
+        // NULL means the defaults, which are Telex with the new tone style.
+        // SAFETY: a NULL configuration is documented as the default.
+        unsafe { viet_engine_set_config(engine, std::ptr::null()) };
+        assert_eq!(type_keys(engine, "vieejt"), "việt");
+
+        // A NULL engine is a no-op rather than a crash.
+        // SAFETY: a NULL engine is documented as a no-op.
+        unsafe { viet_engine_set_config(std::ptr::null_mut(), &telex) };
+        unsafe { viet_engine_free(engine) };
+    }
+
+    #[test]
+    fn applying_a_configuration_drops_the_word_in_progress() {
+        // A change of rule pack must not leave a half-typed word to be finished by the new
+        // rules: the session is reset instead.
+        // SAFETY: as above.
+        let engine = unsafe { viet_engine_new(std::ptr::null()) };
+        type_keys(engine, "viee"); // a word in progress, no boundary yet
+        let configuration = viet_config_t {
+            method: 2,
+            tone_style: 1,
+            auto_restore: 1,
+            spell_check: 0,
+            free_tone_mark: 1,
+        };
+        // SAFETY: as above.
+        unsafe { viet_engine_set_config(engine, &configuration) };
+        // The next key starts a new word, so `d9` is `đ` rather than VNI marks on `viê`.
+        assert_eq!(type_keys(engine, "d9"), "đ");
+        unsafe { viet_engine_free(engine) };
     }
 
     #[test]

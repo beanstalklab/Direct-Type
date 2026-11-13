@@ -803,22 +803,58 @@ plus the human: type `vieejt`, press Alt+Z, type `test`, press Alt+Z again.
 
 **Description:** Expose the engine's five knobs through fcitx5's configuration: method
 (Telex, Simple Telex, VNI), tone style (old, new), `auto_restore`, `spell_check`,
-`free_tone_mark`, plus the toggle key. `Config::set_config` requires a reset when the
-method changes, and the addon must honour that.
+`free_tone_mark`, plus the toggle key. `Engine::set_config` requires a reset when the method
+changes, and the addon must honour that.
 
 **Acceptance criteria:**
-- [ ] Every field of `viet_config_t` is settable from `fcitx5-configtool`
-- [ ] Changing the method resets the engine, so a half-typed word is not rewritten by the
-      new rule pack
-- [ ] Defaults match the engine's: Telex, new tone style, `auto_restore` on,
-      `spell_check` off, `free_tone_mark` on
-- [ ] Settings survive a restart
+- [x] Every field of `viet_config_t` is settable, and reaches the engine as the ABI's numbers
+- [x] Changing a setting resets the engine, so a half-typed word is not finished by the new
+      rule pack
+- [x] Defaults match the engine's: Telex, new tone style, `auto_restore` on, `spell_check`
+      off, `free_tone_mark` on
+- [x] Settings survive a restart
+- [ ] The options appear in `fcitx5-configtool` and the changes take effect in a session —
+      **human check**, the daemon is not installed here (what can be checked headlessly is:
+      the description names every enum value, so the combos are combos and not text fields)
 
-**Verification:** human: change each option, type a word that shows it took effect.
+**Decisions recorded in this task:**
+
+- The C ABI needed a function it did not have: `viet_engine_set_config`. Adding it to
+  `viet.h`, the Rust side and the C smoke test was the first half of this task, and it is
+  documented to drop the word in progress — a settings change is not a typing event, and the
+  text on screen was derived with the previous rule pack. The smoke test now switches a live
+  engine from VNI back to Telex and back to the defaults, and the symbol is on the
+  must-export list.
+- The method and tone style are `FCITX_CONFIG_ENUM`s declared in namespace `fcitx`, which is
+  what makes `Option`'s description dump emit `Enum/0..N`; without it `fcitx5-configtool`
+  would render a text field the user cannot fill in correctly. The test checks those entries
+  by name.
+- The option→ABI mapping lives in `config.cpp` as `toEngineConfiguration`, not inline in the
+  engine, because it is the one place where a wrong number means "VNI selected, Telex
+  typed" and nothing else would notice. `config_check` asserts every enum value and every
+  switch maps to its own ABI field, including the old/new tone style numbers.
+- `applyConfiguration` pushes the options through `TypingSession::setEngineConfiguration`,
+  which is the same seam the typing test uses, so the settings path is covered by code the
+  tests already run.
+- `Configurable=True` in the addon metadata: the config UI is generated from `getConfig()`,
+  so there is no `.ui`/`.desktop` file to maintain.
+
+**Verification:**
+```bash
+cmake -S addon -B addon/build -DCMAKE_BUILD_TYPE=Release
+cmake --build addon/build
+ctest --test-dir addon/build --output-on-failure
+cargo test -p viet-ffi
+bash scripts/c_smoke_test.sh
+```
+plus the human check in `fcitx5-configtool`.
 
 **Dependencies:** T4.2
-**Files:** `addon/src/config.cpp`, `addon/src/config.h`, `addon/src/engine.cpp`,
-`addon/directtype.conf.in`
+**Files:** `crates/viet-ffi/src/lib.rs`, `crates/viet-ffi/include/viet.h`,
+`crates/viet-ffi/tests/smoke.c`, `scripts/c_smoke_test.sh`, `addon/src/config.h`,
+`addon/src/config.cpp`, `addon/src/engine.cpp`, `addon/src/typing.h`,
+`addon/src/typing.cpp`, `addon/directtype.conf.in`, `addon/tests/config_check.cpp`,
+`addon/tests/typing_check.cpp`, `addon/CMakeLists.txt`
 **Scope:** M
 
 ## T4.5 — Tray indicator

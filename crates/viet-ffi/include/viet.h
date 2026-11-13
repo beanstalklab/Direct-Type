@@ -51,6 +51,11 @@ viet_engine_t *viet_engine_new(const viet_config_t *configuration);
 void           viet_engine_free(viet_engine_t *engine);
 void           viet_engine_reset(viet_engine_t *engine);
 
+/* Apply a configuration. The word in progress is dropped: a settings change is not a
+   typing event. A NULL configuration applies the defaults, like viet_engine_new(NULL). */
+void viet_engine_set_config(viet_engine_t *engine,
+                            const viet_config_t *configuration);
+
 /* out_action and both string spans point into engine-owned memory, valid until
    the next viet_engine_feed call. Output pointers may be NULL if unused. */
 void viet_engine_feed(viet_engine_t *engine, const viet_input_t *input,

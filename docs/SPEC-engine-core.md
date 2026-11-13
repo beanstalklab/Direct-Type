@@ -101,6 +101,10 @@ viet_engine_t *viet_engine_new(const viet_config_t *configuration);
 void           viet_engine_free(viet_engine_t *engine);
 void           viet_engine_reset(viet_engine_t *engine);
 
+/* Apply a configuration at runtime; the word in progress is dropped. */
+void viet_engine_set_config(viet_engine_t *engine,
+                            const viet_config_t *configuration);
+
 /* out_action and both string spans point into engine-owned memory,
    valid until the next viet_engine_feed call. No allocation crosses the boundary. */
 void viet_engine_feed(viet_engine_t *engine, const viet_input_t *input,
@@ -125,6 +129,11 @@ Spans and counts, in the detail T3.1 pinned down:
 - `viet.h` and the Rust implementation are checked against each other from C, not only
   from Rust: `scripts/c_smoke_test.sh` links `tests/smoke.c` against `libviet.a` **and**
   `libviet.so`, having verified that the shared library exports every declared symbol.
+- `viet_engine_set_config` (added in T4.4) applies a configuration at runtime and **drops
+  the word in progress**. A settings change is not a typing event, and the text on screen
+  was derived with the previous rule pack; re-deriving it under the new one would rewrite
+  text the user did not type. A NULL configuration applies the defaults, like
+  `viet_engine_new(NULL)`.
 
 ## 3. Engine behaviour (the part that must be right)
 

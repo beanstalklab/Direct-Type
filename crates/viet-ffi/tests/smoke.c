@@ -135,6 +135,19 @@ int main(void) {
         check(strcmp(text, "\xC4\x91\xC6\xB0\xE1\xBB\x9D" "ng") == 0, "VNI reaches duong");
     }
 
+    /* A configuration can be changed at runtime: the same engine, another rule pack. */
+    if (vni != NULL) {
+        configuration.method = 0;
+        viet_engine_set_config(vni, &configuration);
+        type_keys(vni, "vieejt", text, sizeof text);
+        check(strcmp(text, "vi\xE1\xBB\x87" "t") == 0,
+              "an engine can switch back to Telex");
+        viet_engine_set_config(vni, NULL);
+        type_keys(vni, "uowng", text, sizeof text);
+        check(strcmp(text, "\xC6\xB0\xC6\xA1" "ng") == 0,
+              "a NULL configuration applies the defaults");
+    }
+
     /* A NULL configuration means the defaults, as the header promises. */
     viet_engine_t *defaults = viet_engine_new(NULL);
     check(defaults != NULL, "an engine is created from NULL");

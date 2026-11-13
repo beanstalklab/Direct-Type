@@ -27,6 +27,11 @@ public:
     /// Drop the word in progress without changing the language.
     void reset();
 
+    /// Apply a new engine configuration. The word in progress is dropped by the engine: a
+    /// settings change is not a typing event, and the text on screen was derived with the
+    /// previous rule pack.
+    void setEngineConfiguration(const viet_config_t &configuration);
+
     /// Switch the language. The word in progress is dropped rather than rewritten: the text
     /// on screen belongs to the application, and a toggle must never edit it. The next key
     /// starts a fresh word, so nothing from the previous one leaks across the switch.

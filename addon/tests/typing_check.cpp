@@ -110,6 +110,10 @@ public:
 
     void setVietnameseEnabled(bool enabled) { session_.setVietnameseEnabled(enabled); }
 
+    void setEngineConfiguration(const viet_config_t &configuration) {
+        session_.setEngineConfiguration(configuration);
+    }
+
 private:
     directtype::TypingSession session_;
     StringTarget target_;
@@ -199,6 +203,23 @@ int main() {
         typer.type("s");
         check(typer.text() == "\xC3\xA1" "d\xC3\xA1",
               "the fresh word transforms on its own");
+    }
+
+    // A settings change reaches the engine, and it drops the word in progress rather than
+    // finishing it under the new rule pack.
+    {
+        Typer typer(telexConfiguration());
+        typer.type("viee");
+        check(typer.text() == "vi\xC3\xAA", "a word is in progress");
+
+        viet_config_t vni = telexConfiguration();
+        vni.method = 2;
+        typer.setEngineConfiguration(vni);
+        check(typer.text() == "vi\xC3\xAA", "changing the method edits nothing");
+
+        typer.type("d9");
+        check(typer.text() == "vi\xC3\xAA\xC4\x91",
+              "the next word starts fresh, in the new method");
     }
 
     if (failures != 0) {

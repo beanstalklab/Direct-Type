@@ -76,7 +76,7 @@ When SOLID conflicts with clarity, prefer clarity and say why in the change.
 
 ## Verification
 
-Current phase: **Phase 4 — `ime-addon`, T4.3 done (typing + toggle), T4.4 (settings) next**. The commands below are the only accepted
+Current phase: **Phase 4 — `ime-addon`, T4.4 done (typing + toggle + settings), T4.5 (status) next**. The commands below are the only accepted
 verification; run them from the repository root. Do not substitute different
 commands, and do not lower a check to get to green.
 
@@ -200,11 +200,16 @@ commands, and do not lower a check to get to green.
   so `typing_check` covers English passthrough and mid-word toggling headlessly, and
   `config_check` points `XDG_CONFIG_HOME` at a temporary directory and proves the language
   comes back on the next engine. Four addon ctest cases, all mutation-checked.
+- **T4.4 done**: the five engine knobs and the toggle key are fcitx5 config options
+  (`Configurable=True`, so the UI is generated), mapped to `viet_config_t` in one function
+  that the tests check value by value. The C ABI gained `viet_engine_set_config`, which drops
+  the word in progress; the smoke test switches a live engine between methods, and the symbol
+  is on the must-export list. Settings persist to
+  `~/.config/fcitx5/conf/directtype.conf` and are asserted after a restart.
 - **The fcitx5 daemon is not installed on this machine** (only `libfcitx5core-dev` and the
-  frontends), so loading into a running session, `fcitx5-configtool` and typing in real
-  applications are human checks on a machine that has fcitx5. That is the only part of T4.2's
-  and T4.3's acceptance still open.
-- Nothing is installable yet: no config UI, no tray, no installer. Next is T4.4.
+  frontends), so loading into a running session, `fcitx5-configtool`, the status indicator and
+  typing in real applications are human checks on a machine that has fcitx5.
+- Nothing is installable yet: no status indicator, no installer. Next is T4.5.
 - `test` → `tét` stays `tét`: `tét` is real Vietnamese (`nét`, `mét`, `sét` share its
   rhyme), so no spelling rule may rewrite it. English typing needs the toggle key, or
   `free_tone_mark` off. Do not "fix" this by weakening the tables; the corpus case

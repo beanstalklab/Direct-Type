@@ -77,7 +77,7 @@ direct typing through the C ABI (T4.2), then the language toggle (T4.3), configu
 - [x] **T4.1 Addon that loads**
 - [x] **T4.2 Direct typing through the C ABI**
 - [x] **T4.3 Language toggle**
-- [ ] **T4.4 Configuration UI**
+- [x] **T4.4 Configuration UI**
 - [ ] **T4.5 Tray indicator**
 - [ ] **T4.6 One-command install**
 

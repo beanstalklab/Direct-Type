@@ -49,22 +49,11 @@ private:
     fcitx::InputContext *inputContext_;
 };
 
-/// The engine configuration the addon starts with: the documented defaults (spec §2.1),
-/// spelled out so the addon cannot drift from them. T4.4 exposes these as options.
-viet_config_t engineConfiguration() {
-    viet_config_t configuration;
-    configuration.method = 0;     // telex
-    configuration.tone_style = 1; // new
-    configuration.auto_restore = 1;
-    configuration.spell_check = 0;
-    configuration.free_tone_mark = 1;
-    return configuration;
-}
-
 } // namespace
 
-DirectTypeEngine::DirectTypeEngine() : config_(), session_(engineConfiguration()) {
-    // The state of the previous session, if there is one.
+DirectTypeEngine::DirectTypeEngine()
+    : config_(), session_(directtype::toEngineConfiguration(config_)) {
+    // The settings of the previous session, if there are any.
     reloadConfig();
 }
 
@@ -154,5 +143,6 @@ void DirectTypeEngine::reloadConfig() {
 }
 
 void DirectTypeEngine::applyConfiguration() {
+    session_.setEngineConfiguration(directtype::toEngineConfiguration(config_));
     session_.setVietnameseEnabled(config_.vietnameseEnabled.value());
 }
