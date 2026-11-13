@@ -150,8 +150,12 @@ asfrxj	ạ
 #
 # Doubling a tone key undoes it and keeps the letter; `z` removes the tone and puts
 # the tone key's letter back where it was typed.
+#
+# `aass` is the one case `auto_restore` changes: the undo leaves `âs`, which is not a
+# syllable, so the boundary gives the keystrokes back. The undo rule itself is pinned
+# by the `telex` unit tests and by the `auto_restore` off engine test.
 ass	as
-aass	âs
+aass	aass
 toanss	toans
 asz	as
 asdz	asd

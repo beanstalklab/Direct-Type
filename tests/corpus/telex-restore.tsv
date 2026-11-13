@@ -1,0 +1,38 @@
+# `auto_restore`, spec §3.5. The default configuration has it on, so a finished word
+# that is not a Vietnamese syllable is given back as the keystrokes that typed it.
+# The engine decides at the word boundary, which the runner sends at the end of the
+# line and before every space.
+#
+# A coda Vietnamese never spells: the marks have to go.
+asd	asd
+asdf	asdf
+oow	oow
+#
+# An undone tone left a mark no syllable ends with.
+aass	aass
+#
+# A letter modifier that produced a word no syllable spells.
+a[	a[
+#
+# Words that are Vietnamese keep every mark.
+dduowngf	đường
+vieejt	việt
+aw	ă
+dd	đ
+tiếng	tiếng
+#
+# The undo of a modifier is not restored: the shown text is already what was typed,
+# minus the key that undid the mark.
+aaa	aa
+ddd	dd
+aww	aw
+uoww	uow
+#
+# The restore lands before the space, not after it.
+asd asd	asd asd
+asd toán	asd toán
+#
+# Limit of the rule, pinned so a later weakening of the tables fails here: `tét` is a
+# real syllable (`nét`, `mét` and `sét` share its rhyme), so `auto_restore` must keep
+# it. Typing English needs the language toggle, or `free_tone_mark` off.
+test	tét

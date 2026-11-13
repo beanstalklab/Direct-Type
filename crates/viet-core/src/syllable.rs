@@ -38,17 +38,38 @@ impl Syllable {
     }
 }
 
+/// Copy the characters of `word` into `buffer` and report how many there are.
+///
+/// `None` means the word does not fit: an over-long word is refused rather than
+/// truncated, because a truncated word would be read as a different syllable.
+pub(crate) fn copy_letters_into(
+    word: &str,
+    buffer: &mut [char; MAXIMUM_SYLLABLE_CHARACTERS],
+) -> Option<usize> {
+    let mut length = 0;
+    for character in word.chars() {
+        if length == buffer.len() {
+            return None;
+        }
+        buffer[length] = character;
+        length += 1;
+    }
+    Some(length)
+}
+
 /// Split `word` into a syllable, or `None` when it is not exactly one syllable.
 pub(crate) fn parse(word: &str) -> Option<Syllable> {
     let mut letters = ['\0'; MAXIMUM_SYLLABLE_CHARACTERS];
-    let mut length = 0;
-    for character in word.chars() {
-        if length == MAXIMUM_SYLLABLE_CHARACTERS {
-            return None;
-        }
-        letters[length] = character;
-        length += 1;
-    }
+    let length = copy_letters_into(word, &mut letters)?;
+    parse_letters(&letters[..length])
+}
+
+/// Split a word that the caller already copied into a fixed buffer.
+///
+/// The spelling checks (`spelling`) call this with letters they hold themselves, so
+/// there is one reading of the `qu`/`gi` rules rather than one per caller.
+pub(crate) fn parse_letters(letters: &[char]) -> Option<Syllable> {
+    let length = letters.len();
     if length == 0 {
         return None;
     }
@@ -113,7 +134,7 @@ pub(crate) fn parse(word: &str) -> Option<Syllable> {
 }
 
 /// Vowels are the letters that can carry a tone. `y` counts: `quý`, `khuya`.
-fn is_vowel(character: char) -> bool {
+pub(crate) fn is_vowel(character: char) -> bool {
     matches!(
         base_letter(character).to_ascii_lowercase(),
         'a' | 'e' | 'i' | 'o' | 'u' | 'y'

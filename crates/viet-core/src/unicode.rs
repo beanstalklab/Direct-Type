@@ -243,6 +243,32 @@ pub(crate) fn with_tone(character: char, tone: Tone) -> Option<char> {
     vowel_forms(character).map(|row| row.forms[tone.index()])
 }
 
+/// The tone `character` carries, or `None` when it is untoned.
+///
+/// This is the inverse of [`with_tone`], which the spelling checks need: `tét` and
+/// `tết` are different syllables, `tét` and `tẹt` are the same one.
+pub(crate) fn tone_of(character: char) -> Option<Tone> {
+    const TONES: [Tone; 5] = [
+        Tone::Acute,
+        Tone::Grave,
+        Tone::HookAbove,
+        Tone::Tilde,
+        Tone::UnderDot,
+    ];
+    let row = vowel_forms(character)?;
+    TONES
+        .into_iter()
+        .find(|tone| row.forms[tone.index()] == character)
+}
+
+/// The same letter with its tone removed, quality mark and case kept.
+pub(crate) fn without_tone(character: char) -> char {
+    match vowel_forms(character) {
+        Some(row) => row.forms[0],
+        None => character,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -328,6 +354,27 @@ mod tests {
         assert_eq!(with_tone('ế', Tone::Grave), Some('ề'));
         assert_eq!(with_tone('Ư', Tone::HookAbove), Some('Ử'));
         assert_eq!(with_tone('n', Tone::Acute), None);
+    }
+
+    #[test]
+    fn tones_are_found_and_removed_without_touching_the_quality() {
+        for row in VOWEL_FORMS {
+            for (index, form) in row.forms.iter().enumerate() {
+                if index == 0 {
+                    assert_eq!(tone_of(*form), None, "{form:?} is untoned");
+                } else {
+                    assert_eq!(
+                        tone_of(*form).map(Tone::index),
+                        Some(index),
+                        "{form:?} has the wrong tone"
+                    );
+                }
+                assert_eq!(without_tone(*form), row.forms[0], "{form:?}");
+            }
+        }
+        assert_eq!(tone_of('n'), None);
+        assert_eq!(without_tone('đ'), 'đ');
+        assert_eq!(without_tone('n'), 'n');
     }
 
     #[test]

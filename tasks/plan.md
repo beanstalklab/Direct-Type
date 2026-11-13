@@ -41,7 +41,7 @@ Each task ends with something you can type into and observe via `viet-cli`.
 **Checkpoint B:** `viet type --method telex "vieejt"` prints `việt`; parser unit tests cover `qu`, `gi`, 1/2/3-vowel nuclei, coda/no-coda.
 
 - [x] **T1.4 Telex tone keys, tone removal, free tone mark**
-- [ ] **T1.5 Auto-restore and spell-check**
+- [x] **T1.5 Auto-restore and spell-check**
 - [ ] **T1.6 Case handling (lower/UPPER/Title/mixed)**
 
 **Checkpoint C:** `telex-new.tsv` and `telex-old.tsv` green; every rule in spec §3.4 has 3 cases plus a counter-example.
@@ -75,21 +75,28 @@ Each task ends with something you can type into and observe via `viet-cli`.
 | Hand-written rules diverge from UniKey behaviour users expect | Medium | Keep `auto_restore` and `spell_check` as switches, so disagreement is a setting, not a bug report |
 | Zero-dep Unicode table is hand-generated and could be wrong | Medium | Generate it from a cited Unicode data version; test all 134 mappings round-trip |
 | Scope creep into macros/conversion/UI | Medium | Those are explicitly outside the capability map; reject in review |
-| `free_tone_mark` interacts with auto-restore in surprising ways | Low | Implement last in Phase 1; property test that no keystroke is lost |
+| `free_tone_mark` interacts with auto-restore in surprising ways | Low | Closed in T1.5: `auto_restore` acts at the boundary only, `spell_check` while typing, and a property test compares a restoring engine against a non-restoring one over 2,000 generated words |
 
 ## Open Questions
 
 - **Q1 (blocks T0.3):** confirm zero runtime crates + static table, vs `unicode-normalization`.
-- **Q2 (answered for T1.2 and T1.4):** corpus source. Both tasks used hand-written
-  cases derived from spec §3.2/§3.4 — no imported word list, no third-party oracle;
-  152 tone cases and 22 old-style tone cases now pass. Still open: how the corpus
-  grows past hand-written cases to Checkpoint C's 2,000. Options: import a public
-  Vietnamese word list (needs a licence check) or compare against `fcitx5-bamboo` as
-  an oracle (best coverage, needs its own harness).
+- **Q2 (answered for T1.2, T1.4 and T1.5):** corpus source. All three tasks used
+  hand-written cases derived from spec §3.2/§3.4/§3.5 — no imported word list, no
+  third-party oracle; 152 tone cases, 22 old-style tone cases and 17 restore cases now
+  pass. T1.5 did consult `fcitx5-bamboo`'s core for the *closed spelling inventories*
+  (onset/nucleus/coda, `spelling.go`, MIT), which is a source for a table, not an
+  oracle for behaviour. Still open: how the corpus grows past hand-written cases to
+  Checkpoint C's 2,000. Options: import a public Vietnamese word list (needs a licence
+  check) or compare against `fcitx5-bamboo` as an oracle (best coverage, needs its own
+  harness).
 - **Q3 (answered):** default `tone_style`: `New` (`hòa/thủy`). Implemented as
   `ToneStyle::default()` in T1.3 and exercised by `telex-tone.tsv` in T1.4.
-- **Q4 (blocks first commit):** project name + licence. `unikey` is a trademark; rename before the repo is published.
-- **Q5:** `free_tone_mark` in v1 — proposed yes.
+- **Q4 (partly answered):** project name + licence: `directtype`, `MIT OR Apache-2.0`
+  (spec §10 D2/D5). Still human work: the working directory is named `unikey` and must
+  be renamed before publication, and the copyright holder is recorded as `beanstalklab`
+  and needs confirming before the first release.
+- **Q5 (answered):** `free_tone_mark` in v1, default on (spec §10 D4), implemented in
+  T1.4 and pinned by the T1.5 corpus case `test → tét`.
 
 ## Out of Scope
 

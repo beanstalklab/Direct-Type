@@ -240,11 +240,40 @@ cargo run -p viet-cli -- check tests/corpus
 **Description:** Invalid syllable + `auto_restore` → commit raw keystrokes. `spell_check` on → leave non-Vietnamese-looking words untouched. Applies to both Telex and the shared buffer.
 
 **Acceptance criteria:**
-- [ ] `asd` with `auto_restore` commits `asd` (raw), not a half-transformed string
-- [ ] Restore never loses or reorders a keystroke (property test)
-- [ ] `spell_check` on: `hello` passes through unchanged
-- [ ] `spell_check` off: engine commits its best transformed attempt
-- [ ] Both switches independent; 4-way config matrix tested
+- [x] `asd` with `auto_restore` commits `asd` (raw), not a half-transformed string
+- [x] Restore never loses or reorders a keystroke (property test)
+- [x] `spell_check` on: `hello` passes through unchanged
+- [x] `spell_check` off: engine commits its best transformed attempt
+- [x] Both switches independent; 4-way config matrix tested
+- [x] A word that is Vietnamese keeps every mark (`dduowngf` → `đường`, `vieejt` → `việt`)
+
+**Decisions recorded in this task:**
+
+- Spelling validity is a closed-set membership test on onset, nucleus and coda, with
+  the inventories taken from `BambooEngine/bamboo-core` (`spelling.go`, MIT). The
+  tables over-generate on purpose: no nucleus-to-coda matrix, and rare-but-real
+  spellings are listed. A word wrongly called invalid would be restored as raw keys,
+  which destroys the user's diacritics; a word wrongly called valid only keeps a
+  transformation the toggle key can undo. See spec §3.6 and decision D6.
+- `auto_restore` acts at the boundary, `spell_check` acts while typing (D7). The
+  boundary is the first moment "not Vietnamese" is final, so `uwow` shows `ưo` while
+  it is still growing; `spell_check` is the stricter switch and may revert mid-word.
+- Three guards keep the restore away from words that are not mangled text: the shown
+  text equals the keystrokes, or has no diacritic, or has no vowel. That protects
+  `hello`, the undo artefacts (`aaa` → `aa`, `ddd` → `dd`, `aww` → `aw`) and `đ`
+  from `dd`.
+- The test text said `test` → `test`; that needs a source correction rather than an
+  engine change. `tét` is real Vietnamese (`nét`, `mét`, `sét` share its rhyme), so a
+  rule that only asks "is this a syllable?" must keep it. `test` → `test` happens with
+  `free_tone_mark` off, and English typing needs the toggle key. Pinned as a corpus
+  case so a later weakening of the tables fails there.
+- `aass` → `âs` is the one T1.4 case `auto_restore` changes: the undone tone leaves a
+  word no syllable spells, so the boundary gives `aass` back. The T1.4 rule is pinned
+  with `auto_restore` off.
+- The restoring boundary action reports `consumed: false` with the whole word as
+  `backspaces` + `commit`, so a space still inserts a space after the rewrite. The
+  engine drops its view of the shown text at that moment, otherwise the next word
+  would report deletions against text the frontend has already replaced.
 
 **Verification:**
 ```bash
@@ -253,7 +282,9 @@ cargo test --workspace
 ```
 
 **Dependencies:** T1.4
-**Files:** `crates/viet-core/src/lib.rs`, `crates/viet-core/src/syllable.rs`, `tests/corpus/restore.tsv`
+**Files:** `crates/viet-core/src/lib.rs`, `crates/viet-core/src/spelling.rs`,
+`crates/viet-core/src/syllable.rs`, `crates/viet-core/src/unicode.rs`,
+`crates/viet-cli/src/corpus.rs`, `tests/corpus/telex-restore.tsv`
 **Scope:** M
 
 ---

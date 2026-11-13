@@ -76,7 +76,7 @@ When SOLID conflicts with clarity, prefer clarity and say why in the change.
 
 ## Verification
 
-Current phase: **T1.5 (auto-restore and spell-check)**. The commands below are the only accepted
+Current phase: **T1.6 (case handling)**. The commands below are the only accepted
 verification; run them from the repository root. Do not substitute different
 commands, and do not lower a check to get to green.
 
@@ -98,14 +98,25 @@ commands, and do not lower a check to get to green.
   `free_tone_mark` on (default) and off, old/new placement. The mark is placed from
   the finished syllable, so `toasn → toán`; a tone key outside a syllable stays a
   letter (`sz → sz`) and a word that never becomes one syllable keeps every keystroke
-  (`ashello`). 230 corpus cases (152 tone cases + 22 old-style tone cases), 51 core
-  tests. Checkpoint B (`vieejt` → `việt`) closed.
-- Next: T1.5 — `auto_restore` and `spell_check`. Today an invalid word commits the
-  letter transformation with every tone key literal; a Vietnamese buffer is already
-  correct, so T1.5 is about `test` → `tét` becoming `test` again.
-- Not implemented, by design: auto-restore and spell-check (T1.5), case matrix (T1.6),
-  VNI (T1.7), Simple Telex's restricted rule set (T1.8). Those methods currently pass
-  letters through unchanged.
+  (`ashello`). Checkpoint B (`vieejt` → `việt`) closed.
+- **T1.5 done**: `auto_restore` (default on) gives the raw keystrokes back at the word
+  boundary when the finished word is not a Vietnamese syllable (`asd`, `asdf`, `oow`),
+  and `spell_check` (default off) refuses a transformation the word can no longer
+  justify while typing (`asd` never shows `ád`, `aaa` stays `aaa`). Spelling validity
+  is a closed-set onset/nucleus/coda test in `crates/viet-core/src/spelling.rs`, whose
+  inventories come from `fcitx5-bamboo`'s `spelling.go`; it over-generates on purpose,
+  because a wrongly rejected word loses the user's diacritics. 247 corpus cases
+  (152 tone + 22 old-style + 17 restore), 68 core tests, including a property test
+  that a restore never loses or reorders a keystroke.
+- Next: T1.6 — the case matrix (`VIEEJT → VIỆT`, `Vieejt → Việt`, `vIeejt → vIệt`).
+  Case already follows the letter that carries a mark; what T1.6 owes is the
+  mixed-case guarantee and its corpus coverage.
+- `test` → `tét` stays `tét`: `tét` is real Vietnamese (`nét`, `mét`, `sét` share its
+  rhyme), so no spelling rule may rewrite it. English typing needs the toggle key, or
+  `free_tone_mark` off. Do not "fix" this by weakening the tables; the corpus case
+  `telex-restore.tsv test → tét` exists to stop that.
+- Not implemented, by design: case matrix (T1.6), VNI (T1.7), Simple Telex's restricted
+  rule set (T1.8). Those methods currently pass letters through unchanged.
 - C ABI names follow the AGENTS.md naming rules (no abbreviations): `code_point`,
   `commit_length`, `preedit_length`, `reserved_flags`, `configuration`, `engine`.
 - Product name: **`directtype`**; the public repository is

@@ -81,8 +81,9 @@ pub fn commit_text(configuration: Config, input: &str) -> String {
 
     for character in input.chars() {
         if character.is_whitespace() {
-            // Whitespace ends the word; the engine never emits it itself.
-            engine.feed(Input::Boundary);
+            // Whitespace ends the word, and `auto_restore` may give the keystrokes
+            // back: that rewrite has to land before the whitespace itself.
+            apply(&mut committed, engine.feed(Input::Boundary));
             committed.push(character);
         } else {
             // The action may rewrite text that is already on screen, so the
@@ -90,7 +91,7 @@ pub fn commit_text(configuration: Config, input: &str) -> String {
             apply(&mut committed, engine.feed(Input::Char(character)));
         }
     }
-    engine.feed(Input::Boundary);
+    apply(&mut committed, engine.feed(Input::Boundary));
     committed
 }
 

@@ -16,12 +16,13 @@ Pre-alpha. What exists today:
   immediately; the raw word is tracked and re-derived on every key, so a Telex
   modifier rewrites what the application already shows (`aa` → `â`) without a
   composition buffer. Telex letters and tone keys work, including old/new tone
-  placement and `free_tone_mark`; auto-restore, spell-check, VNI and Simple Telex's
-  restricted rule set are **not implemented yet**.
+  placement and `free_tone_mark`; `auto_restore` and `spell_check` work on a closed
+  onset/nucleus/coda spelling test. VNI and Simple Telex's restricted rule set are
+  **not implemented yet**.
 - `crates/viet-cli` — `viet-cli type` and `viet-cli check` (golden-corpus runner,
   exit codes `0`/`1`/`2`).
 - `crates/viet-ffi` — a C ABI over the engine, with panics contained at the boundary.
-- 230 corpus cases and CI that runs formatting, lint, tests and the corpus.
+- 247 corpus cases and CI that runs formatting, lint, tests and the corpus.
 
 There is no fcitx5 addon, no installer, and nothing to install yet.
 
@@ -48,10 +49,18 @@ $ cargo run -p viet-cli -- type --method telex "vieejt"
 việt
 ```
 
-Auto-restore is not implemented yet: until it is, a word that never becomes one
-syllable keeps its tone keys as letters (`ashello` → `ashello`), and an English word
-that happens to contain a tone key is transformed the way Telex defines it
-(`test` → `tét`). T1.5 in `tasks/todo.md` is when that changes.
+Auto-restore works on the word boundary, so a word the engine cannot make Vietnamese
+comes back as the keystrokes that typed it:
+
+```console
+$ cargo run -p viet-cli -- type --method telex "asd"
+asd
+```
+
+A word that is Vietnamese keeps its marks, and a word that only *happens* to be
+Vietnamese keeps them too — `test` becomes `tét`, because `tét` is a real syllable
+(`nét`, `mét`, `sét` share its rhyme). Typing English needs the language toggle, or
+`free_tone_mark` off, which leaves the `s` literal.
 
 ## Documentation
 
