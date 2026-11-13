@@ -3,6 +3,7 @@
 #include <string>
 #include <utility>
 
+#include <fcitx-config/iniparser.h>
 #include <fcitx-utils/capabilityflags.h>
 #include <fcitx-utils/keysym.h>
 #include <fcitx/inputcontext.h>
@@ -11,6 +12,10 @@
 #include "typing.h"
 
 namespace {
+
+/// Where `readAsIni` and `safeSaveAsIni` put the settings: the user's fcitx5 config
+/// directory, which is what survives a restart.
+constexpr const char *configurationPath = "conf/directtype.conf";
 
 /// Applies the engine's edits to an fcitx5 input context.
 class InputContextTarget final : public directtype::TextTarget {
@@ -44,9 +49,9 @@ private:
     fcitx::InputContext *inputContext_;
 };
 
-/// The configuration the addon starts with: the engine's documented defaults (spec §2.1),
-/// spelled out here so the addon cannot drift from them. T4.4 makes these editable.
-viet_config_t defaultConfiguration() {
+/// The engine configuration the addon starts with: the documented defaults (spec §2.1),
+/// spelled out so the addon cannot drift from them. T4.4 exposes these as options.
+viet_config_t engineConfiguration() {
     viet_config_t configuration;
     configuration.method = 0;     // telex
     configuration.tone_style = 1; // new
@@ -58,16 +63,12 @@ viet_config_t defaultConfiguration() {
 
 } // namespace
 
-DirectTypeEngine::DirectTypeEngine() : engine_(nullptr) {
-    viet_config_t configuration = defaultConfiguration();
-    engine_ = viet_engine_new(&configuration);
+DirectTypeEngine::DirectTypeEngine() : config_(), session_(engineConfiguration()) {
+    // The state of the previous session, if there is one.
+    reloadConfig();
 }
 
-DirectTypeEngine::~DirectTypeEngine() {
-    if (engine_ != nullptr) {
-        viet_engine_free(engine_);
-    }
-}
+DirectTypeEngine::~DirectTypeEngine() = default;
 
 std::vector<fcitx::InputMethodEntry> DirectTypeEngine::listInputMethods() {
     // The last argument is the addon's unique name and has to match `[Addon] Library`
@@ -83,7 +84,7 @@ std::vector<fcitx::InputMethodEntry> DirectTypeEngine::listInputMethods() {
 bool DirectTypeEngine::consume(directtype::KeyAction action, uint32_t codepoint,
                                fcitx::InputContext *inputContext) {
     InputContextTarget target(inputContext);
-    return directtype::submit(engine_, action, codepoint, &target);
+    return session_.submit(action, codepoint, &target);
 }
 
 void DirectTypeEngine::keyEvent(const fcitx::InputMethodEntry &entry,
@@ -95,6 +96,21 @@ void DirectTypeEngine::keyEvent(const fcitx::InputMethodEntry &entry,
     }
 
     const fcitx::Key key = keyEvent.key();
+
+    // The toggle key is ours in both languages: it is the only way back out of English.
+    if (config_.toggleKey.value().check(key)) {
+        session_.setVietnameseEnabled(!session_.vietnameseEnabled());
+        config_.vietnameseEnabled.setValue(session_.vietnameseEnabled());
+        save();
+        keyEvent.filterAndAccept();
+        return;
+    }
+
+    if (!session_.vietnameseEnabled()) {
+        // English: every key reaches the application exactly as typed.
+        return;
+    }
+
     const directtype::KeyAction action = directtype::classify(key.sym(), key.states());
     if (action == directtype::KeyAction::Boundary) {
         // The word ends here, and `auto_restore` may rewrite it. The key itself is not
@@ -113,10 +129,30 @@ void DirectTypeEngine::keyEvent(const fcitx::InputMethodEntry &entry,
 void DirectTypeEngine::reset(const fcitx::InputMethodEntry &entry,
                              fcitx::InputContextEvent &event) {
     (void)entry;
-    // Focus loss ends the word, so an invalid one is given back before the state is
-    // dropped; whether a commit after focus loss is honoured is the frontend's decision.
-    consume(directtype::KeyAction::Boundary, 0, event.inputContext());
-    if (engine_ != nullptr) {
-        viet_engine_reset(engine_);
+    if (session_.vietnameseEnabled()) {
+        // Focus loss ends the word, so an invalid one is given back before the state is
+        // dropped; whether a commit after focus loss is honoured is the frontend's choice.
+        consume(directtype::KeyAction::Boundary, 0, event.inputContext());
     }
+    session_.reset();
+}
+
+const fcitx::Configuration *DirectTypeEngine::getConfig() const { return &config_; }
+
+void DirectTypeEngine::setConfig(const fcitx::RawConfig &rawConfig) {
+    config_.load(rawConfig, true);
+    applyConfiguration();
+}
+
+void DirectTypeEngine::save() {
+    fcitx::safeSaveAsIni(config_, fcitx::StandardPath::Type::PkgConfig, configurationPath);
+}
+
+void DirectTypeEngine::reloadConfig() {
+    fcitx::readAsIni(config_, fcitx::StandardPath::Type::PkgConfig, configurationPath);
+    applyConfiguration();
+}
+
+void DirectTypeEngine::applyConfiguration() {
+    session_.setVietnameseEnabled(config_.vietnameseEnabled.value());
 }

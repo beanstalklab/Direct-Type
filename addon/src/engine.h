@@ -5,14 +5,15 @@
 
 #include <fcitx/inputmethodengine.h>
 
+#include "config.h"
 #include "keys.h"
-#include "viet.h"
+#include "typing.h"
 
-/// The addon's engine: one input method, one language, one Vietnamese state machine.
+/// The addon's engine: one input method, two languages, one Vietnamese state machine.
 ///
-/// It owns a `viet_engine_t` created through the C ABI. The typing path itself lives in
-/// `typing.cpp`, which knows nothing about fcitx5; this class is the fcitx5 adapter around
-/// it: classify the key, submit it, and implement `TextTarget` on the input context.
+/// The typing path and the language state live in `TypingSession`, which knows nothing
+/// about fcitx5; this class is the adapter around it: classify the key, apply the toggle
+/// key, submit the rest, and persist the settings.
 class DirectTypeEngine final : public fcitx::InputMethodEngine {
 public:
     DirectTypeEngine();
@@ -21,7 +22,8 @@ public:
     DirectTypeEngine(const DirectTypeEngine &) = delete;
     DirectTypeEngine &operator=(const DirectTypeEngine &) = delete;
 
-    /// The single input method this addon provides.
+    /// The single input method this addon provides. Vietnamese and English are two states
+    /// of it, not two entries in fcitx5's list.
     std::vector<fcitx::InputMethodEntry> listInputMethods() override;
 
     void keyEvent(const fcitx::InputMethodEntry &entry,
@@ -32,12 +34,23 @@ public:
     void reset(const fcitx::InputMethodEntry &entry,
                fcitx::InputContextEvent &event) override;
 
+    /// The language state and the toggle key, persisted under
+    /// `~/.config/fcitx5/conf/directtype.conf`.
+    const fcitx::Configuration *getConfig() const override;
+    void setConfig(const fcitx::RawConfig &rawConfig) override;
+    void save() override;
+    void reloadConfig() override;
+
 private:
     /// Feed one classified key and apply the result to `inputContext`.
     bool consume(directtype::KeyAction action, uint32_t codepoint,
                  fcitx::InputContext *inputContext);
 
-    viet_engine_t *engine_;
+    /// Push the persisted settings into the session.
+    void applyConfiguration();
+
+    directtype::DirectTypeConfig config_;
+    directtype::TypingSession session_;
 };
 
 #endif // DIRECTTYPE_ENGINE_H

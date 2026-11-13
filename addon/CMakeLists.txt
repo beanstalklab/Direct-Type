@@ -102,3 +102,14 @@ target_link_libraries(typing_check PRIVATE Fcitx5::Core "${ENGINE_ARCHIVE}" pthr
 target_compile_options(typing_check PRIVATE -Wall -Wextra -Wpedantic -Werror)
 add_dependencies(typing_check engine)
 add_test(NAME typing_check COMMAND typing_check)
+
+# The settings survive a restart, and they live where a restart looks for them.
+add_executable(config_check tests/config_check.cpp src/engine.cpp src/keys.cpp src/typing.cpp)
+target_include_directories(config_check PRIVATE
+    src
+    "${CMAKE_CURRENT_SOURCE_DIR}/../crates/viet-ffi/include"
+)
+target_link_libraries(config_check PRIVATE Fcitx5::Core "${ENGINE_ARCHIVE}" pthread dl m)
+target_compile_options(config_check PRIVATE -Wall -Wextra -Wpedantic -Werror)
+add_dependencies(config_check engine)
+add_test(NAME config_check COMMAND config_check)

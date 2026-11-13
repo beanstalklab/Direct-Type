@@ -22,9 +22,33 @@ viet_input_t boundaryInput() {
 
 } // namespace
 
-bool submit(viet_engine_t *engine, KeyAction action, uint32_t codepoint,
-            TextTarget *target) {
-    if (engine == nullptr) {
+TypingSession::TypingSession(const viet_config_t &configuration)
+    : engine_(viet_engine_new(&configuration)), vietnameseEnabled_(true) {}
+
+TypingSession::~TypingSession() {
+    if (engine_ != nullptr) {
+        viet_engine_free(engine_);
+    }
+}
+
+void TypingSession::reset() {
+    if (engine_ != nullptr) {
+        viet_engine_reset(engine_);
+    }
+}
+
+void TypingSession::setVietnameseEnabled(bool enabled) {
+    if (enabled == vietnameseEnabled_) {
+        return;
+    }
+    // Drop the word in progress. It is already committed on screen, so nothing visible
+    // changes, and the next key starts a new word under the new mode.
+    reset();
+    vietnameseEnabled_ = enabled;
+}
+
+bool TypingSession::submit(KeyAction action, uint32_t codepoint, TextTarget *target) {
+    if (engine_ == nullptr || !vietnameseEnabled_) {
         return false;
     }
 
@@ -32,7 +56,7 @@ bool submit(viet_engine_t *engine, KeyAction action, uint32_t codepoint,
                                                               : boundaryInput();
     viet_action_t result;
     const char *commit = nullptr;
-    viet_engine_feed(engine, &input, &result, &commit, nullptr);
+    viet_engine_feed(engine_, &input, &result, &commit, nullptr);
 
     if (target != nullptr) {
         if (result.backspaces > 0) {

@@ -27,10 +27,11 @@ Pre-alpha. What exists today:
   `crates/viet-ffi/tests/smoke.c` is a C caller linked against both library artifacts.
 - 630 corpus cases and CI that runs formatting, lint, tests and the corpus.
 
-The fcitx5 addon types through the engine (T4.2): it loads, offers one input method named
-"Direct Type", and commits text straight into the application with no preedit. It has no
-language toggle, no settings UI and no installer yet (T4.3–T4.6), so there is still nothing
-to install.
+The fcitx5 addon types through the engine (T4.2) and has its language toggle (T4.3):
+one input method named "Direct Type", text committed straight into the application with no
+preedit, and Alt+Z to switch between Vietnamese and English — remembered across restarts in
+`~/.config/fcitx5/conf/directtype.conf`. It has no settings UI, no tray entry and no
+installer yet (T4.4–T4.6), so there is still nothing to install.
 
 ## Build and test
 

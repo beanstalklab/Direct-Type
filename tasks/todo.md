@@ -750,20 +750,53 @@ plus the human typing test in real applications.
 ## T4.3 — Language toggle
 
 **Description:** Vietnamese and English as two states of one input method, with one
-obvious way to switch: fcitx5's own input method switch, plus a configurable toggle key
-handled inside the addon. The state must be visible and must survive a restart.
+obvious way to switch: a toggle key handled inside the addon. The state must be visible and
+must survive a restart.
 
 **Acceptance criteria:**
-- [ ] Switching to English forwards every key untouched (no transformation, no restore)
-- [ ] The toggle key is configurable and does not swallow the key in English mode
-- [ ] A fresh engine is used for a new word, so a toggle never rewrites the previous word
-- [ ] The choice is persisted in the addon configuration
+- [x] Switching to English forwards every key untouched (no transformation, no restore)
+- [x] The toggle key works in both languages — it is the only way back out of English
+- [x] The key does not swallow anything in English mode; every other key passes through
+- [x] A fresh engine is used for a new word, so a toggle never rewrites the previous word
+- [x] The choice is persisted and restored on the next start
+- [ ] The toggle key in a real session, and that Alt+Z does not collide with the user's
+      own bindings — **human check**
 
-**Verification:** human: type `vieejt`, toggle, type `test`, toggle back, type `vieejt`.
+**Decisions recorded in this task:**
+
+- Vietnamese and English are two states of the addon's single input method, not two entries
+  in fcitx5's input method list. The user asked for one obvious language toggle; a second
+  list entry would be a second thing to configure and would forget which mode was on.
+- Default toggle key is `Alt+Z`: the UniKey habit, unused by fcitx5's own bindings, and a
+  key that can be pressed inside a text field. It is a config option, so T4.4 exposes it in
+  `fcitx5-configtool` and it can be changed now by editing
+  `~/.config/fcitx5/conf/directtype.conf`.
+- The state and the key live in a `FCITX_CONFIGURATION`, persisted through fcitx5's own
+  ini machinery (`readAsIni`/`safeSaveAsIni`, `StandardPath::Type::PkgConfig`) to
+  `$XDG_CONFIG_HOME/fcitx5/conf/directtype.conf`. The engine reloads it in its constructor
+  and saves on every toggle, so a restart — or a crash — comes back in the language the
+  user left.
+- Toggling drops the word in progress instead of rewriting it: the text on screen belongs to
+  the application, and a language switch must never edit it. The next key starts a fresh
+  word, so nothing from the previous one leaks across the switch.
+- `TypingSession` (in `typing.cpp`) now owns the language flag as well as the engine, so the
+  toggle behaviour is testable headlessly: `typing_check` types in English, toggles mid-word
+  and checks nothing was edited, and `config_check` points `XDG_CONFIG_HOME` at a temporary
+  directory, saves, constructs a second engine and checks the language came back. Both
+  mutation-checked (the wrong path, and a toggle that keeps the old word).
+
+**Verification:**
+```bash
+cmake -S addon -B addon/build -DCMAKE_BUILD_TYPE=Release
+cmake --build addon/build
+ctest --test-dir addon/build --output-on-failure
+```
+plus the human: type `vieejt`, press Alt+Z, type `test`, press Alt+Z again.
 
 **Dependencies:** T4.2
-**Files:** `addon/src/engine.cpp`, `addon/src/config.cpp`, `addon/src/config.h`,
-`addon/directtype.conf.in`
+**Files:** `addon/src/config.h`, `addon/src/typing.h`, `addon/src/typing.cpp`,
+`addon/src/engine.h`, `addon/src/engine.cpp`, `addon/tests/typing_check.cpp`,
+`addon/tests/config_check.cpp`, `addon/CMakeLists.txt`
 **Scope:** M
 
 ## T4.4 — Configuration UI
