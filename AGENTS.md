@@ -157,8 +157,15 @@ commands, and do not lower a check to get to green.
 - Not done, blocked on approval: the `cargo-fuzz` target (`libfuzzer-sys`, nightly) and
   the `criterion` benchmark. The user chose dependency-free work first, so Checkpoint E's
   fuzz run stays open.
-- Next: T2.3 — the counting-allocator allocation check can be done with no dependency;
-  the p99 latency benchmark needs the `criterion` decision.
+- **T2.3 partly done**: `crates/viet-core/tests/allocations.rs` proves `feed` allocates
+  nothing after warmup, for all three methods, the corpus' hardest words and a word long
+  enough to cross the 64-key cap; zero allocations in debug and release. This is the only
+  `unsafe` outside `viet-ffi` (spec D8, §8 amended). Mutation-checked: a one-line
+  allocation per keystroke fails it with 14,100 allocations.
+- Still blocked on approval: the `cargo-fuzz` target and the `criterion` p99 benchmark.
+- Next product question, not a task: nothing is installable yet. `viet-cli` prints text;
+  there is no fcitx5 addon, no installer, no toggle key and no tray. Phase 3 (T3.1 C ABI
+  verified, T3.2 C smoke test) plus the addon in T0.2 is what makes it an input method.
 - `test` → `tét` stays `tét`: `tét` is real Vietnamese (`nét`, `mét`, `sét` share its
   rhyme), so no spelling rule may rewrite it. English typing needs the toggle key, or
   `free_tone_mark` off. Do not "fix" this by weakening the tables; the corpus case

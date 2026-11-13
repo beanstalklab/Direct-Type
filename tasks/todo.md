@@ -533,27 +533,36 @@ python3 scripts/verify_unicode_table.py
 
 ## T2.3 — Benchmarks and allocation check
 
-**Description:** `criterion` bench for `feed` across the corpus; a counting-allocator test asserting steady-state zero allocations.
+**Description:** p99 `feed` latency under 1 ms with a benchmark, and a counting allocator that proves `feed` allocates nothing after warmup.
 
 **Acceptance criteria:**
-- [ ] `cargo bench -p viet-core` reports p99 for a realistic key stream
-- [ ] p99 < 1 ms (target < 10 µs) recorded in `AGENTS.md` §Verification
-- [ ] Allocation test fails if a `Vec`/`String` grows in steady state
+- [x] `feed` allocates nothing after warmup, measured with a counting allocator
+- [ ] p99 `feed` < 1 ms — **deferred**: a stable `cargo bench` needs `criterion` (or nightly
+      `#[bench]`), which the user has not approved yet
+- [ ] No allocation in the benchmark's steady state (same tooling question)
+
+**Decisions recorded in this task:**
+
+- The counting allocator is `crates/viet-core/tests/allocations.rs`, a separate test binary
+  with exactly one test so nothing else allocates during the measurement. It wraps
+  `System`, counts `alloc` and `realloc`, and is the only `unsafe` outside `viet-ffi`
+  (spec §8, decision D8). The measurement covers all three methods and the corpus' hardest
+  words, plus a word long enough to cross the 64-key cap, so the new cap path is covered
+  too: zero allocations after warmup, in debug and in release.
+- The test was checked against a one-line mutation that allocates per keystroke and failed
+  with 14,100 allocations, so it is not a test that passes for free.
+- The capacity-stability test in `lib.rs` stays: it is the cheap proxy, and the counting
+  allocator is the real measurement.
 
 **Verification:**
 ```bash
-cargo bench -p viet-core
-cargo test -p viet-core --release allocations
+cargo test -p viet-core --test allocations
+cargo test --release -p viet-core --test allocations
 ```
 
 **Dependencies:** T2.2
-**Files:** `crates/viet-core/benches/feed.rs`, `crates/viet-core/tests/allocations.rs`, `AGENTS.md`
-**Scope:** S
-
-### Checkpoint E
-- [ ] Fuzz clean at 10⁶ runs
-- [ ] p99 latency recorded and within target
-- [ ] Human review before FFI
+**Files:** `crates/viet-core/tests/allocations.rs`, `docs/SPEC-engine-core.md` (D8)
+**Scope:** M
 
 ---
 

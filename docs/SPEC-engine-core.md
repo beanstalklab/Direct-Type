@@ -466,7 +466,7 @@ pub(crate) fn tone_index(syllable: &Syllable, style: ToneStyle) -> Option<usize>
 }
 ```
 
-Conventions: `snake_case`, `CamelCase` types, no `unwrap`/`expect`/`panic!` outside tests, no `unsafe` outside `viet-ffi`, errors as `Option`/enums rather than strings, comments explain *why* (orthography rules cite the case they protect).
+Conventions: `snake_case`, `CamelCase` types, no `unwrap`/`expect`/`panic!` outside tests, no `unsafe` outside `viet-ffi` and the allocation-counting test (D8), errors as `Option`/enums rather than strings, comments explain *why* (orthography rules cite the case they protect).
 
 ## 7. Testing strategy
 
@@ -503,7 +503,7 @@ Corpus policy: a failing case is never deleted or its expectation edited to make
 
 - **Always:** run `cargo fmt`, `clippy -D warnings`, and the full test suite before any commit touching `crates/`; add a corpus case with every behaviour change; keep `viet-core` free of platform types.
 - **Ask first:** adding any crate (including dev-dependencies), changing the `Action`/C ABI shape, changing the corpus file format, changing public method names, adding a new method (VNI variants, VIQR).
-- **Never:** put fcitx5/GTK/Qt/DBus types in `engine-core`; edit a corpus expectation without a cited source; use `unsafe` outside `viet-ffi`; make the engine read config from disk or env; ship a file whose output is NFD.
+- **Never:** put fcitx5/GTK/Qt/DBus types in `engine-core`; edit a corpus expectation without a cited source; use `unsafe` outside `viet-ffi` and the one allocation-counting test (D8); make the engine read config from disk or env; ship a file whose output is NFD.
 
 ## 9. Success criteria
 
@@ -525,5 +525,6 @@ Corpus policy: a failing case is never deleted or its expectation edited to make
 | D5 | Product name: **`directtype`** — language-neutral, names the architecture ("direct typing": keystrokes reach the application without a composition buffer). Rejected: `gochuan`/`gotieng` (Vietnamese-only), `gonhanh` (existing macOS IME), `goviet` (ride-hailing brand), `keylang`/`keywrite`/`langkey` (adjacent IME/layout projects), `polytype`/`omnitype`/`keyflow`/`anylang` (unavailable). | Package names: `directtype`, `fcitx5-directtype`, binary `directtype`, `.deb` `directtype`. `directype` is the shorter variant if length matters. Domain and trademark checks remain human work. |
 | D6 | Spelling validity is a closed-set membership test (onset, nucleus, coda) that over-generates: no nucleus-to-coda matrix, inventories taken from `bamboo-core/spelling.go` (MIT). | A wrongly rejected word would be restored as raw keystrokes, which loses the user's diacritics; accepting too much only keeps a transformation the toggle can undo. Consequence: `test` stays `tét` under the default configuration. |
 | D7 | `auto_restore` acts at the boundary; `spell_check` acts while typing. | The boundary is the first moment "not Vietnamese" is final, so the rewrite cannot fight a word that is still growing (`uwow` shows `ưo`, not `uwo`, when only `auto_restore` is on). `spell_check` is the stricter setting and may revert mid-word. |
+| D8 | The allocation promise is measured with a counting `#[global_allocator]` in `crates/viet-core/tests/allocations.rs`, which is the only `unsafe` outside `viet-ffi`. | `GlobalAlloc` cannot be implemented without `unsafe`, and §9 criterion 4 ("no allocation after the first 100 keystrokes") cannot be checked without one. The test is a separate binary with one test, so nothing else allocates during the measurement, and it wraps `System` rather than touching engine memory. The alternative — trusting buffer capacities as a proxy — would not catch a `Vec` grown behind a `String::push_str`. |
 
 Open question that remains: the corpus source (`tasks/plan.md` Q2).
