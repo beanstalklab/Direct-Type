@@ -248,6 +248,13 @@ commands, and do not lower a check to get to green.
   accepting keys) and `SurroundingText` (delete API, used only with valid surrounding text,
   else backspaces). `TypingResult` carries the deltas and the whole word, and the typing test
   drives both frontends with the same keystrokes to prove they agree.
+- **T4.9 done**: `Rewrite=Auto` is the default. Reading fcitx5's Wayland frontend showed why no
+  global strategy could work: it advertises `SurroundingText` but
+  `deleteSurroundingTextDelegate` returns silently when the application sends no surrounding
+  text; forwarded keys exist via a virtual keyboard but are not ordered with the commit; and
+  the protocol only carries the *client* preedit, so `ClientPreedit=False` shows nothing on
+  Wayland. `Auto` therefore rewrites in place only where surrounding text is valid, and keeps a
+  preedit elsewhere. Package 0.0.4.
 - Checkpoint G remains the only thing left in Phase 4: install on a machine with fcitx5 and
   type `vieejt` in a real application — and now, specifically, in Sublime Text and a
   terminal, where the previous build failed.

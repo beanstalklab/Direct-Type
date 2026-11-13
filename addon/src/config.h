@@ -20,10 +20,14 @@ FCITX_CONFIG_ENUM(DirectTypeToneStyle, Old, New);
 /// How the word reaches the application while it is being typed.
 ///
 /// There is no single answer on Linux: a preedit is drawn by the application (and some lie
-/// about being able to), the surrounding-text API is optional (and some accept the commit and
-/// drop the deletion), and forwarded backspace keys work in any field that accepts keys. The
-/// strategies have different costs, so the choice is the user's.
-FCITX_CONFIG_ENUM(DirectTypeRewrite, Preedit, Backspace, SurroundingText);
+/// about being able to), the surrounding-text API is optional (and silently ignored when the
+/// application does not send surrounding text), and forwarded backspace keys travel a
+/// different protocol than the commit, with no ordering guarantee.
+///
+/// `Auto` resolves it per input context: rewrite in place when the application sends
+/// surrounding text, otherwise keep a preedit. The others force one answer, for when `Auto`
+/// guesses wrong.
+FCITX_CONFIG_ENUM(DirectTypeRewrite, Auto, Preedit, Backspace, SurroundingText);
 
 } // namespace fcitx
 
@@ -45,7 +49,7 @@ FCITX_CONFIGURATION(
         this, "ToneStyle", _("Tone placement"), fcitx::DirectTypeToneStyle::New};
     fcitx::Option<fcitx::DirectTypeRewrite> rewrite{
         this, "Rewrite", _("How the word reaches the application"),
-        fcitx::DirectTypeRewrite::Preedit};
+        fcitx::DirectTypeRewrite::Auto};
     fcitx::Option<bool> autoRestore{this, "AutoRestore",
                                     _("Restore a word that is not Vietnamese"), true};
     fcitx::Option<bool> spellCheck{this, "SpellCheck",

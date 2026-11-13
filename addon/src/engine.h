@@ -63,6 +63,10 @@ private:
     void applyDirectly(const directtype::TypingResult &result,
                        fcitx::InputContext *inputContext);
 
+    /// Which strategy actually applies to this input context. `Auto` rewrites in place when
+    /// the application sends surrounding text and keeps a preedit when it does not.
+    fcitx::DirectTypeRewrite effectiveRewrite(fcitx::InputContext *inputContext) const;
+
     /// Finish the word in the preedit by committing it. Used when the word has to end for a
     /// reason the engine does not see: a toggle, a configuration change, a lost focus.
     void commitWord(fcitx::InputContext *inputContext);

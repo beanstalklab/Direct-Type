@@ -90,9 +90,25 @@ std::vector<fcitx::InputMethodEntry> DirectTypeEngine::listInputMethods() {
     return entries;
 }
 
+fcitx::DirectTypeRewrite
+DirectTypeEngine::effectiveRewrite(fcitx::InputContext *inputContext) const {
+    const fcitx::DirectTypeRewrite configured = config_.rewrite.value();
+    if (configured != fcitx::DirectTypeRewrite::Auto) {
+        return configured;
+    }
+    // Rewriting in place needs the application to send surrounding text: fcitx5's Wayland
+    // frontend silently drops a deletion it cannot map, and the application never notices.
+    if (inputContext != nullptr &&
+        inputContext->capabilityFlags().test(fcitx::CapabilityFlag::SurroundingText) &&
+        inputContext->surroundingText().isValid()) {
+        return fcitx::DirectTypeRewrite::SurroundingText;
+    }
+    return fcitx::DirectTypeRewrite::Preedit;
+}
+
 void DirectTypeEngine::publish(const directtype::TypingResult &result,
                                fcitx::InputContext *inputContext) {
-    if (config_.rewrite.value() != fcitx::DirectTypeRewrite::Preedit) {
+    if (effectiveRewrite(inputContext) != fcitx::DirectTypeRewrite::Preedit) {
         applyDirectly(result, inputContext);
         return;
     }
@@ -117,7 +133,7 @@ void DirectTypeEngine::applyDirectly(const directtype::TypingResult &result,
         // atomic request that some applications accept and ignore, and forwarded backspace
         // keys work in any field that accepts keys. That is why the strategy is a setting.
         const bool surroundingText =
-            config_.rewrite.value() == fcitx::DirectTypeRewrite::SurroundingText &&
+            effectiveRewrite(inputContext) == fcitx::DirectTypeRewrite::SurroundingText &&
             inputContext->capabilityFlags().test(fcitx::CapabilityFlag::SurroundingText) &&
             inputContext->surroundingText().isValid();
         if (surroundingText) {
@@ -136,7 +152,7 @@ void DirectTypeEngine::applyDirectly(const directtype::TypingResult &result,
 }
 
 void DirectTypeEngine::commitWord(fcitx::InputContext *inputContext) {
-    if (config_.rewrite.value() != fcitx::DirectTypeRewrite::Preedit) {
+    if (effectiveRewrite(inputContext) != fcitx::DirectTypeRewrite::Preedit) {
         // The application already has the text: there is no preedit to clear.
         if (session_.hasWord()) {
             // End the word the way a boundary would, so `auto_restore` still gets its say.

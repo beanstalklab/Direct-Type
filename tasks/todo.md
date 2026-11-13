@@ -1024,7 +1024,10 @@ space-to-finish. The two direct strategies exist and are now selectable, because
 works in every application.
 
 **Acceptance criteria:**
-- [x] `Rewrite` option: `Preedit`, `Backspace`, `SurroundingText`
+- [x] `Rewrite` option: `Auto` (default), `Preedit`, `Backspace`, `SurroundingText`
+- [x] `Auto` rewrites in place when the input context sends valid surrounding text, and keeps
+      a preedit when it does not — the failure matrix turned out to be decided by the
+      application, not by a global strategy
 - [x] `Backspace` and `SurroundingText` commit each keystroke and rewrite through the engine's
       deltas: no preedit, no boundary needed for the text to appear
 - [x] `SurroundingText` is used only when the application advertises the capability **and**
@@ -1051,6 +1054,16 @@ works in every application.
   against the same keystrokes and compares the text.
 - `commitWord` (toggle, settings change, focus loss) ends the word through a boundary action in
   direct mode too, so `auto_restore` still gets its say; in preedit mode it commits the buffer.
+- `Auto` became the default after reading fcitx5's Wayland frontend: it advertises
+  `SurroundingText`, but `deleteSurroundingTextDelegate` **returns silently** when it cannot
+  map the request, so an application that does not send surrounding text loses the deletion
+  with no error. `Auto` therefore asks the input context for valid surrounding text and only
+  then rewrites in place. Forwarded keys do exist there (a virtual keyboard), but they travel a
+  different protocol than the commit and are not ordered with it, which is the second way to
+  produce `DĐoôỗ` — another reason not to rely on them.
+- `ClientPreedit=False` is a trap on Wayland and is documented as such: the frontend sends
+  only `inputPanel().clientPreedit()` over the protocol, so the panel preedit is never
+  delivered and the application shows nothing.
 
 **Verification:**
 ```bash

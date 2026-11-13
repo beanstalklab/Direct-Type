@@ -43,11 +43,11 @@ boundary, Alt+Z to switch between Vietnamese and English, and method, tone place
 `~/.config/fcitx5/conf/directtype.conf`. fcitx5's status area shows the active language next
 to the input method name.
 
-How the word reaches the application is a setting, because Linux clients differ: `Preedit`
-shows the word underlined and commits it at the boundary, `Backspace` commits every keystroke
-and rewrites it with forwarded backspace keys (works in any field that accepts keys), and
-`SurroundingText` rewrites through the surrounding-text API (fastest, and only where the
-application implements it).
+How the word reaches the application is resolved per input context: when the application
+sends surrounding text, the addon commits each keystroke and rewrites it in place (no
+underline, text as you type); when it does not, the word is kept in a preedit and committed at
+the boundary. `Rewrite` can force either one, or the forwarded-backspace variant, for the
+applications that need a specific answer.
 
 ## Install
 
