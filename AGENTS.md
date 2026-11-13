@@ -76,7 +76,7 @@ When SOLID conflicts with clarity, prefer clarity and say why in the change.
 
 ## Verification
 
-Current phase: **Phase 4 — `ime-addon`, T4.4 done (typing + toggle + settings), T4.5 (status) next**. The commands below are the only accepted
+Current phase: **Phase 4 — `ime-addon`, T4.5 done (typing, toggle, settings, status), T4.6 (install) next**. The commands below are the only accepted
 verification; run them from the repository root. Do not substitute different
 commands, and do not lower a check to get to green.
 
@@ -179,11 +179,14 @@ commands, and do not lower a check to get to green.
   enabling it cannot break typing.
 - Facts pinned while building it, because guessing cost time in this phase: fcitx5 5.1.7's
   CMake package has **no** `fcitx5_addon()` helper (declare the module and installs by
-  hand), the engine base class is `InputMethodEngine` (**not** `InputMethodEngineV2`, which
-  is not in 5.1.7), and `Fcitx5UtilsConfig.cmake` defaults the install dirs to
-  `${CMAKE_INSTALL_PREFIX}/lib/fcitx5` (`/usr/local/...`, a directory fcitx5 never reads)
-  unless `FCITX_INSTALL_USE_FCITX_SYS_PATHS=On`. `DIRECTTYPE_ADDON_DIR` and
-  `DIRECTTYPE_DATA_DIR` are the cache variables to override for a per-user install.
+  hand), the status area's language label only exists on `InputMethodEngineV2`
+  (`InputMethodEngine::subModeLabel` dynamic-casts to V2 and returns an empty string
+  otherwise, so an engine that subclasses the base shows nothing — an earlier note here
+  wrongly said V2 did not exist in 5.1.7), and `Fcitx5UtilsConfig.cmake` defaults the
+  install dirs to `${CMAKE_INSTALL_PREFIX}/lib/fcitx5` (`/usr/local/...`, a directory
+  fcitx5 never reads) unless `FCITX_INSTALL_USE_FCITX_SYS_PATHS=On`.
+  `DIRECTTYPE_ADDON_DIR` and `DIRECTTYPE_DATA_DIR` are the cache variables to override for
+  a per-user install.
 - **T4.2 done**: the addon types through the C ABI. The typing path lives in
   `addon/src/typing.cpp` and depends on a two-method `TextTarget` (delete characters, insert
   text) instead of fcitx5, so `addon/tests/typing_check.cpp` types real words headlessly —
@@ -206,10 +209,16 @@ commands, and do not lower a check to get to green.
   the word in progress; the smoke test switches a live engine between methods, and the symbol
   is on the must-export list. Settings persist to
   `~/.config/fcitx5/conf/directtype.conf` and are asserted after a restart.
+- **T4.5 done**: the status area's label is the active language, via
+  `subModeLabelImpl` on `InputMethodEngineV2`, and it is refreshed with
+  `updateUserInterface(StatusArea, true)` on every toggle so it follows immediately. The
+  addon draws no tray icon of its own: fcitx5's area shows the input method name and our
+  one-word label. `statusLabel` is a pure function the tests check, and `load_check` asserts
+  the engine is a V2 — without that the status area would show no language at all.
 - **The fcitx5 daemon is not installed on this machine** (only `libfcitx5core-dev` and the
-  frontends), so loading into a running session, `fcitx5-configtool`, the status indicator and
-  typing in real applications are human checks on a machine that has fcitx5.
-- Nothing is installable yet: no status indicator, no installer. Next is T4.5.
+  frontends), so loading into a running session, `fcitx5-configtool`, seeing the status label
+  and typing in real applications are human checks on a machine that has fcitx5.
+- Nothing is installable yet: no installer. Next is T4.6, the one-command install.
 - `test` → `tét` stays `tét`: `tét` is real Vietnamese (`nét`, `mét`, `sét` share its
   rhyme), so no spelling rule may rewrite it. English typing needs the toggle key, or
   `free_tone_mark` off. Do not "fix" this by weakening the tables; the corpus case

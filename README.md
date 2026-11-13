@@ -32,8 +32,9 @@ settings (T4.4): one input method named "Direct Type", text committed straight i
 application with no preedit, Alt+Z to switch between Vietnamese and English, and method,
 tone placement, `auto_restore`, `spell_check`, `free_tone_mark` and the toggle key in
 `fcitx5-configtool` — all remembered across restarts in
-`~/.config/fcitx5/conf/directtype.conf`. It has no status indicator and no installer yet
-(T4.5, T4.6), so there is still nothing to install.
+`~/.config/fcitx5/conf/directtype.conf`. fcitx5's status area shows the active language
+next to the input method name (T4.5). There is no installer yet (T4.6), so there is still
+nothing to install.
 
 ## Build and test
 

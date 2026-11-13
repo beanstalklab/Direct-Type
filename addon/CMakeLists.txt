@@ -39,6 +39,7 @@ add_library(directtype MODULE
     src/config.cpp
     src/engine.cpp
     src/keys.cpp
+    src/status.cpp
     src/typing.cpp
 )
 add_dependencies(directtype engine)
@@ -106,7 +107,7 @@ add_test(NAME typing_check COMMAND typing_check)
 
 # The settings survive a restart, and they live where a restart looks for them.
 add_executable(config_check tests/config_check.cpp
-    src/config.cpp src/engine.cpp src/keys.cpp src/typing.cpp)
+    src/config.cpp src/engine.cpp src/keys.cpp src/status.cpp src/typing.cpp)
 target_include_directories(config_check PRIVATE
     src
     "${CMAKE_CURRENT_SOURCE_DIR}/../crates/viet-ffi/include"

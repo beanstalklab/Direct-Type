@@ -14,7 +14,12 @@
 /// The typing path and the language state live in `TypingSession`, which knows nothing
 /// about fcitx5; this class is the adapter around it: classify the key, apply the toggle
 /// key, submit the rest, and persist the settings.
-class DirectTypeEngine final : public fcitx::InputMethodEngine {
+///
+/// `InputMethodEngineV2` rather than `InputMethodEngine` because the sub-mode label — the
+/// "Vietnamese"/"English" text in fcitx5's status area — only exists on V2:
+/// `InputMethodEngine::subModeLabel` dynamic-casts to V2 and returns an empty string
+/// otherwise, so overriding `subMode()` on the base would show nothing at all.
+class DirectTypeEngine final : public fcitx::InputMethodEngineV2 {
 public:
     DirectTypeEngine();
     ~DirectTypeEngine() override;
@@ -33,6 +38,10 @@ public:
     /// before the state is dropped.
     void reset(const fcitx::InputMethodEntry &entry,
                fcitx::InputContextEvent &event) override;
+
+    /// What the status area shows next to the input method name: the active language.
+    std::string subModeLabelImpl(const fcitx::InputMethodEntry &entry,
+                                 fcitx::InputContext &inputContext) override;
 
     /// The language state and the toggle key, persisted under
     /// `~/.config/fcitx5/conf/directtype.conf`.

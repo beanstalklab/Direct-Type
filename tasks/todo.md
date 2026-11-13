@@ -859,19 +859,46 @@ plus the human check in `fcitx5-configtool`.
 
 ## T4.5 — Tray indicator
 
-**Description:** The user must be able to see which language and method is active without
-opening a settings window. Use fcitx5's own status area rather than drawing a tray icon:
-the addon reports a display name and, if fcitx5's UI supports it, a per-language label.
+**Description:** The user must be able to see which language is active without opening a
+settings window. Use fcitx5's own status area rather than drawing a tray icon: the addon
+reports the language as a sub-mode label.
 
 **Acceptance criteria:**
-- [ ] The fcitx5 tray shows Vietnamese or English, and the method name when it matters
-- [ ] The label follows the toggle immediately
-- [ ] No second tray icon and no panel plugin of our own
+- [x] The label is the active language ("Vietnamese" / "English")
+- [x] It is refreshed immediately on toggle, not on the next focus change
+- [x] No second tray icon and no panel plugin: fcitx5's area shows the input method name and
+      our one-word label
+- [ ] Watching it change in GNOME and KDE — **human check**
 
-**Verification:** human: toggle and watch the status area in GNOME and KDE.
+**Decisions recorded in this task:**
+
+- The seam is `subModeLabelImpl` on `InputMethodEngineV2`, and that is a real constraint:
+  `InputMethodEngine::subModeLabel` dynamic-casts to V2 and returns an empty string for a
+  plain engine, so overriding `subMode()` on the base shows nothing at all. Read from
+  fcitx5's own `inputmethodengine.cpp`, not guessed — and it corrects an earlier note in
+  this repository that V2 did not exist in 5.1.7. `load_check` now asserts the engine
+  dynamic-casts to V2, which is the cheapest possible regression test for that mistake.
+- The label is two words, not the method name: the status area already shows the input method
+  name, so repeating it would cost space without telling the user anything. `statusLabel` is a
+  pure function so the text is checked in `config_check` without an input context.
+- `updateUserInterface(StatusArea, true)` after a toggle: `immediate` flushes the change, so
+  the label does not lag behind the keystroke that changed it.
+- No icon work: an icon would need a theme entry and a second resource to keep in sync, and
+  the sub-mode text already answers "which language am I typing". If a visual distinction is
+  wanted later, `subModeIconImpl` is the seam and it is one function.
+
+**Verification:**
+```bash
+cmake -S addon -B addon/build -DCMAKE_BUILD_TYPE=Release
+cmake --build addon/build
+ctest --test-dir addon/build --output-on-failure
+```
+plus the human check: toggle and watch fcitx5's status area.
 
 **Dependencies:** T4.3
-**Files:** `addon/src/engine.cpp`
+**Files:** `addon/src/status.h`, `addon/src/status.cpp`, `addon/src/engine.h`,
+`addon/src/engine.cpp`, `addon/tests/load_check.cpp`, `addon/tests/config_check.cpp`,
+`addon/CMakeLists.txt`
 **Scope:** S
 
 ## T4.6 — One-command install

@@ -55,6 +55,10 @@ int main(int argc, char **argv) {
 
             auto *engine = dynamic_cast<fcitx::InputMethodEngine *>(instance.get());
             check(engine != nullptr, "the instance is an input method engine");
+            // The status area asks for the sub-mode label through V2 and shows nothing for
+            // a plain engine, so being a V2 is what makes the language visible at all.
+            check(dynamic_cast<fcitx::InputMethodEngineV2 *>(engine) != nullptr,
+                  "the engine is a V2, or the status area would show no language");
             if (engine != nullptr) {
                 std::vector<fcitx::InputMethodEntry> entries = engine->listInputMethods();
                 check(entries.size() == 1, "the engine offers exactly one input method");

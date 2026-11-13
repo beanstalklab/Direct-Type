@@ -7,7 +7,9 @@
 #include <fcitx-utils/capabilityflags.h>
 #include <fcitx-utils/keysym.h>
 #include <fcitx/inputcontext.h>
+#include <fcitx/userinterface.h>
 
+#include "status.h"
 #include "text_target.h"
 #include "typing.h"
 
@@ -91,6 +93,11 @@ void DirectTypeEngine::keyEvent(const fcitx::InputMethodEntry &entry,
         session_.setVietnameseEnabled(!session_.vietnameseEnabled());
         config_.vietnameseEnabled.setValue(session_.vietnameseEnabled());
         save();
+        if (auto *inputContext = keyEvent.inputContext()) {
+            // The status area shows the language as a sub-mode. Refresh it here so the label
+            // follows the toggle immediately instead of waiting for the next focus change.
+            inputContext->updateUserInterface(fcitx::UserInterfaceComponent::StatusArea, true);
+        }
         keyEvent.filterAndAccept();
         return;
     }
@@ -124,6 +131,13 @@ void DirectTypeEngine::reset(const fcitx::InputMethodEntry &entry,
         consume(directtype::KeyAction::Boundary, 0, event.inputContext());
     }
     session_.reset();
+}
+
+std::string DirectTypeEngine::subModeLabelImpl(const fcitx::InputMethodEntry &entry,
+                                               fcitx::InputContext &inputContext) {
+    (void)entry;
+    (void)inputContext;
+    return directtype::statusLabel(session_.vietnameseEnabled());
 }
 
 const fcitx::Configuration *DirectTypeEngine::getConfig() const { return &config_; }

@@ -14,6 +14,7 @@
 
 #include "config.h"
 #include "engine.h"
+#include "status.h"
 
 namespace {
 
@@ -80,6 +81,13 @@ int main() {
         check(mapped.spell_check == 1 && mapped.auto_restore == 0 && mapped.free_tone_mark == 0,
               "the switches map to their own fields");
     }
+
+    // The status area's label is the language, and it is the only text the addon puts there:
+    // the input method name is fcitx5's business.
+    check(directtype::statusLabel(true) == "Vietnamese",
+          "the status area says Vietnamese when it is on");
+    check(directtype::statusLabel(false) == "English",
+          "the status area says English when it is off");
 
     std::filesystem::remove_all(temporary);
     std::filesystem::create_directories(temporary);
