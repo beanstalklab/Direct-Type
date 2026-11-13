@@ -903,21 +903,56 @@ plus the human check: toggle and watch fcitx5's status area.
 
 ## T4.6 — One-command install
 
-**Description:** `install.sh` builds the engine and the addon, installs both into the
-user's fcitx5 prefix, enables the addon, and restarts fcitx5. Uninstall is one flag. No
-root for a per-user install; `sudo` for a system-wide one.
+**Description:** `install.sh` installs Direct Type, from a prebuilt package when one is at
+hand and from source otherwise. Uninstall is one flag. It refuses to half-succeed.
 
 **Acceptance criteria:**
-- [ ] On a clean Ubuntu with fcitx5 and its dev headers, `./install.sh` ends with a working
-      Vietnamese input method, with no manual step
-- [ ] `./install.sh --uninstall` removes everything it added
-- [ ] Running it twice is safe (idempotent)
-- [ ] It fails loudly, with the package name to install, when a dependency is missing
+- [x] `scripts/build_deb.sh` produces a Debian package with the module, its metadata and the
+      documentation, and its runtime dependencies computed from the binary
+- [x] `./install.sh` installs it; `--from-source` builds first; `--uninstall` removes it
+- [x] Running it twice is safe (`apt-get install --reinstall`)
+- [x] It fails loudly, naming the packages to install, when fcitx5 or the toolchain is missing
+- [x] The module extracted **from the package** passes the addon load check
+- [ ] A real install on a machine with fcitx5, then typing in an application — **human
+      check**, this machine has no fcitx5 daemon
 
-**Verification:** a container or VM with fcitx5, plus the human's desktop once.
+**Decisions recorded in this task:**
+
+- The deliverable is a `.deb`, not a source-only script: the user wants to download one file
+  and install it. The package is self-contained because the Rust engine is linked statically
+  into the addon, and its `Depends` are computed with `dpkg-shlibdeps` from the built module
+  (`libc6 (>= 2.39)`, `libfcitx5core7 (>= 5.1.7)`, …) instead of being written down by hand —
+  a wrong dependency here is an addon that silently does not load. `Recommends: fcitx5`
+  because the daemon is what makes the addon useful.
+- Built on this machine (Ubuntu 24.04, x86_64), so the package targets Ubuntu 24.04+ on
+  x86_64: `libc6 (>= 2.39)` is the hard line, and 22.04 or an ARM laptop needs a rebuild from
+  source. The version is `0.0.0`, the version every manifest in the tree carries; the first
+  real release version is a human decision.
+- The installer installs files and restarts fcitx5, then prints the one manual step: adding
+  "Direct Type" to the input method list in `fcitx5-configtool`. Editing
+  `~/.config/fcitx5/profile` automatically was rejected: a malformed profile loses every
+  input method the user has, and this machine has no fcitx5 to validate the result against.
+  One documented click beats an untested rewrite of the user's configuration.
+- `--reinstall` makes a second run a no-op rather than an error, which is what "idempotent"
+  means in a script a person runs twice.
+- The installer's logic was exercised with stubbed `fcitx5`, `sudo`, `apt-get` and
+  `fcitx5-remote` on the PATH, so the apt invocation, the restart and the "missing
+  prerequisite" branch are all checked here; only the real install needs a real machine.
+- CI builds the package and runs the load check against the module *inside* it, so packaging
+  cannot rot separately from the build tree.
+
+**Verification:**
+```bash
+bash scripts/build_deb.sh
+dpkg-deb --contents dist/directtype_*_amd64.deb
+./install.sh --help
+./install.sh            # on a machine with fcitx5
+./install.sh --uninstall
+```
 
 **Dependencies:** T4.1–T4.5
-**Files:** `install.sh`, `README.md`
+**Files:** `install.sh`, `scripts/build_deb.sh`, `.gitignore`, `.github/workflows/ci.yml`,
+`README.md`
 **Scope:** M
 
 ### Checkpoint G — installable

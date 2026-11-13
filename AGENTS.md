@@ -76,7 +76,7 @@ When SOLID conflicts with clarity, prefer clarity and say why in the change.
 
 ## Verification
 
-Current phase: **Phase 4 — `ime-addon`, T4.5 done (typing, toggle, settings, status), T4.6 (install) next**. The commands below are the only accepted
+Current phase: **Phase 4 done — the addon and its package are complete; Checkpoint G needs a machine with fcitx5**. The commands below are the only accepted
 verification; run them from the repository root. Do not substitute different
 commands, and do not lower a check to get to green.
 
@@ -218,7 +218,15 @@ commands, and do not lower a check to get to green.
 - **The fcitx5 daemon is not installed on this machine** (only `libfcitx5core-dev` and the
   frontends), so loading into a running session, `fcitx5-configtool`, seeing the status label
   and typing in real applications are human checks on a machine that has fcitx5.
-- Nothing is installable yet: no installer. Next is T4.6, the one-command install.
+- **T4.6 done**: `scripts/build_deb.sh` builds `dist/directtype_0.0.0_amd64.deb` (module,
+  metadata, documentation, `Depends` computed by `dpkg-shlibdeps` from the binary), and
+  `install.sh` installs it (`--package`, `--from-source`, `--uninstall`), naming the missing
+  packages when fcitx5 or the toolchain is absent. The module extracted from the package
+  passes the addon load check, and CI builds and checks it. Target: Ubuntu 24.04+ x86_64
+  (`libc6 (>= 2.39)`, `libfcitx5core7`); 22.04 or ARM needs a source build.
+- Checkpoint G is the only thing left in Phase 4: install on a machine with fcitx5, add
+  "Direct Type" in `fcitx5-configtool`, and type `vieejt` in a real application. Nothing on
+  this machine can do that — it has no fcitx5 daemon and no GUI.
 - `test` → `tét` stays `tét`: `tét` is real Vietnamese (`nét`, `mét`, `sét` share its
   rhyme), so no spelling rule may rewrite it. English typing needs the toggle key, or
   `free_tone_mark` off. Do not "fix" this by weakening the tables; the corpus case
@@ -239,6 +247,7 @@ cargo test --workspace
 cmake -S addon -B addon/build -DCMAKE_BUILD_TYPE=Release
 cmake --build addon/build
 ctest --test-dir addon/build --output-on-failure
+bash scripts/build_deb.sh                       # the installable package
 cargo run -p viet-cli -- check tests/corpus     # exit 0/1/2
 cargo bench -p viet-core                        # from T2.3 onwards
 ```

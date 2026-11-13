@@ -27,14 +27,25 @@ Pre-alpha. What exists today:
   `crates/viet-ffi/tests/smoke.c` is a C caller linked against both library artifacts.
 - 630 corpus cases and CI that runs formatting, lint, tests and the corpus.
 
-The fcitx5 addon types through the engine (T4.2), has its language toggle (T4.3) and its
-settings (T4.4): one input method named "Direct Type", text committed straight into the
-application with no preedit, Alt+Z to switch between Vietnamese and English, and method,
-tone placement, `auto_restore`, `spell_check`, `free_tone_mark` and the toggle key in
+The fcitx5 addon types through the engine, has its language toggle and its settings: one
+input method named "Direct Type", text committed straight into the application with no
+preedit, Alt+Z to switch between Vietnamese and English, and method, tone placement,
+`auto_restore`, `spell_check`, `free_tone_mark` and the toggle key in
 `fcitx5-configtool` — all remembered across restarts in
-`~/.config/fcitx5/conf/directtype.conf`. fcitx5's status area shows the active language
-next to the input method name (T4.5). There is no installer yet (T4.6), so there is still
-nothing to install.
+`~/.config/fcitx5/conf/directtype.conf`. fcitx5's status area shows the active language next
+to the input method name.
+
+## Install
+
+```console
+$ bash scripts/build_deb.sh          # or download the .deb
+$ ./install.sh                       # needs sudo; --uninstall removes it
+```
+
+Then add "Direct Type" to the input method list in `fcitx5-configtool` and press Apply.
+The package targets **Ubuntu 24.04+ on x86_64** (`libc6 (>= 2.39)`, `libfcitx5core7`);
+on another distribution or architecture, `./install.sh --from-source` builds it there.
+It needs fcitx5 itself, which the installer checks for and names if it is missing.
 
 ## Build and test
 

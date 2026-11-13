@@ -24,6 +24,14 @@ jobs:
       - name: Check that the addon loads
         run: ctest --test-dir addon/build --output-on-failure
 
+      - name: Build the Debian package
+        run: bash scripts/build_deb.sh
+
+      - name: Check the addon loads from the package as well
+        run: |
+          dpkg-deb -x dist/directtype_*_amd64.deb /tmp/unpacked
+          addon/build/addon_load_check /tmp/unpacked/usr/lib/*/fcitx5/directtype.so
+
   verify:
     runs-on: ubuntu-24.04
     steps:
