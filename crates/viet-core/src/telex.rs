@@ -41,6 +41,59 @@ impl RulePack for Telex {
     }
 }
 
+/// Simple Telex: the same tone keys as Telex, and only `aa`, `ee`, `oo`, `w` and `dd`
+/// as letter modifiers (spec §3.2).
+///
+/// With no horn and no breve shortcuts, the method is for a keyboard that already has
+/// `ă` and `ơ` on its layout: the letters pass through, and the rule pack adds the
+/// circumflex, the stroke, the `ư` of `w` and the tones. `w` produces `ư` only while
+/// the word is still an onset, so `aw` stays `aw` instead of turning into a word the
+/// user did not type.
+pub(crate) struct SimpleTelex;
+
+impl RulePack for SimpleTelex {
+    fn tone_of_key(key: char) -> Option<Tone> {
+        Telex::tone_of_key(key)
+    }
+
+    fn removes_tone(key: char) -> bool {
+        Telex::removes_tone(key)
+    }
+
+    const RESTORES_TONE_KEY_LETTER: bool = true;
+
+    fn append(
+        output: &mut String,
+        key: char,
+        origin: Origin,
+        _more_letters_follow: bool,
+    ) -> Origin {
+        match key.to_ascii_lowercase() {
+            'w' => append_simple_w(output, key, origin),
+            'a' | 'e' | 'o' => append_circumflex(output, key, origin),
+            'd' => append_stroke(output, key, origin),
+            _ => append_literal(output, key),
+        }
+    }
+}
+
+/// `w → ư` at the start of a word (`w`, `hw`, `thw`), and a plain letter after a
+/// vowel: `aw` stays `aw`, because without the horn shortcut there is no word `ă` there
+/// to build.
+fn append_simple_w(output: &mut String, key: char, origin: Origin) -> Origin {
+    if undo_inserted_w(output, origin) {
+        return Origin::Literal;
+    }
+    let still_an_onset = output
+        .chars()
+        .all(|letter| !crate::syllable::is_vowel(letter));
+    if still_an_onset {
+        output.push(horned_u_with_case(key));
+        return Origin::ModifierKey(key);
+    }
+    append_literal(output, key)
+}
+
 /// Apply one letter keystroke and report how the trailing letter now came about.
 fn append_letter(
     output: &mut String,
@@ -93,15 +146,8 @@ fn append_stroke(output: &mut String, key: char, origin: Origin) -> Origin {
 
 /// `w → ư`, `aw → ă`, `uw → ư`, `ow → ơ`, `uow → uơ`, and `uowng → ương`.
 fn append_w(output: &mut String, key: char, origin: Origin, more_letters_follow: bool) -> Origin {
-    // `ww → w`: a second `w` cancels the letter the first one produced. The letter
-    // that stays is the one already on screen, case included, because an undo must not
-    // also change what the user sees (`Ww → W`, not `w`).
-    if let Origin::ModifierKey(produced) = origin {
-        if produced.eq_ignore_ascii_case(&'w') {
-            output.pop();
-            output.push(produced);
-            return Origin::Literal;
-        }
+    if undo_inserted_w(output, origin) {
+        return Origin::Literal;
     }
 
     let Some(previous) = output.chars().next_back() else {
@@ -125,6 +171,20 @@ fn append_w(output: &mut String, key: char, origin: Origin, more_letters_follow:
         // letter that Vietnamese does not spell.
         None => append_literal(output, key),
     }
+}
+
+/// `ww → w`: a second `w` cancels the letter the first one produced. The letter that
+/// stays is the one already on screen, case included, because an undo must not also
+/// change what the user sees (`Ww → W`, not `w`).
+fn undo_inserted_w(output: &mut String, origin: Origin) -> bool {
+    if let Origin::ModifierKey(produced) = origin {
+        if produced.eq_ignore_ascii_case(&'w') {
+            output.pop();
+            output.push(produced);
+            return true;
+        }
+    }
+    false
 }
 
 /// `[ → ơ`, `] → ư`, and `[[ → [` on the same undo rule as `ww`.
@@ -156,6 +216,41 @@ mod tests {
         let mut output = String::new();
         input::apply::<Telex>(raw_keystrokes, &Config::default(), &mut output);
         output
+    }
+
+    fn transform_simple(raw_keystrokes: &str) -> String {
+        let mut output = String::new();
+        input::apply::<SimpleTelex>(raw_keystrokes, &Config::default(), &mut output);
+        output
+    }
+
+    #[test]
+    fn simple_telex_keeps_only_the_circumflex_and_the_stroke() {
+        let cases = [
+            ("aa", "â"),
+            ("ee", "ê"),
+            ("oo", "ô"),
+            ("dd", "đ"),
+            ("w", "ư"),
+            ("hw", "hư"),
+            ("thw", "thư"),
+            // No breve, no horn, no bracket letters.
+            ("aw", "aw"),
+            ("ow", "ow"),
+            ("uw", "uw"),
+            ("uow", "uow"),
+            ("[", "["),
+            ("]", "]"),
+            // The tone keys are Telex's, on the same placement rules.
+            ("aas", "ấ"),
+            ("vieejt", "việt"),
+            ("toans", "toán"),
+            // A key the pack does not claim keeps the case it was typed with.
+            ("aW", "aW"),
+        ];
+        for (raw, expected) in cases {
+            assert_eq!(transform_simple(raw), expected, "raw {raw:?}");
+        }
     }
 
     #[test]

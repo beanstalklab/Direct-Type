@@ -1,0 +1,72 @@
+# Simple Telex, spec §3.2: the same tone keys and tone placement as Telex, with only
+# `aa`, `ee`, `oo`, `w` and `dd` as letter modifiers. It is for a keyboard that already
+# has `ă` and `ơ` on its layout: those letters pass through, the pack adds the
+# circumflex, the stroke, the `ư` of `w` and the tone.
+#
+# `w` produces `ư` only while the word is still an onset, so `aw` stays `aw` instead of
+# becoming a word the user did not type.
+aa	â
+ee	ê
+oo	ô
+dd	đ
+w	ư
+hw	hư
+thw	thư
+dw	dư
+ww	w
+Ww	W
+wW	w
+#
+# No breve, no horn, no bracket letters.
+aw	aw
+ow	ow
+uw	uw
+uow	uow
+AW	AW
+a[	a[
+a]	a]
+[	[
+]	]
+#
+# Tone keys and placement are Telex's.
+as	á
+af	à
+ar	ả
+ax	ã
+aj	ạ
+AS	Á
+As	Á
+aS	á
+aas	ấ
+aaf	ầ
+eef	ề
+aasj	ậ
+toans	toán
+hoasn	hoán
+vieejt	việt
+vieetj	việt
+#
+# `z` removes a tone and gives the tone key's letter back, as in Telex.
+ass	as
+asz	as
+asdz	asd
+ASs	AS
+#
+# Doubling undoes the mark and keeps the key.
+aaa	aa
+ddd	dd
+Aa	Â
+aA	â
+DD	Đ
+#
+# Letters this pack does not claim stay as typed: digits, `[`, `]` and the Telex
+# shortcuts it leaves out.
+ban1	ban1
+n6	n6
+telex	telex
+hello	hello
+#
+# Words the restricted rule set cannot build come back as the keystrokes, because
+# `auto_restore` finds no syllable: `aw`, `uow` and the horn in `dduowng`.
+dduowng	dduowng
+thuong	thuong

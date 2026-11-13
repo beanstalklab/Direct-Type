@@ -174,6 +174,19 @@ VNI, in the detail T1.7 pinned down (key table from `fcitx5-bamboo`,
 - Nothing leaks between methods: `w`, `[`, `]`, `s`, `z` are ordinary letters in VNI,
   and `1`–`9` are ordinary characters in Telex (`telex` stays `telex`).
 
+Simple Telex, in the detail T1.8 pinned down:
+
+- Tone keys, tone removal and placement are Telex's; only `aa`, `ee`, `oo`, `w` and
+  `dd` remain as letter modifiers. With no horn and no breve shortcut, the method is
+  for a keyboard that already has `ă` and `ơ` on its layout: those letters pass through
+  and the pack adds the circumflex, the stroke, the `ư` of `w` and the tones.
+- `w` produces `ư` only while the word is still an onset (`w → ư`, `hw → hư`,
+  `thw → thư`). After a vowel it is a letter, so `aw` stays `aw` instead of becoming a
+  word the user did not type — and that holds with `auto_restore` off as well, not by
+  being restored afterwards.
+- `[` and `]` are ordinary characters, and any key the pack does not claim keeps the
+  case it was typed with (`aW` stays `aW`).
+
 ### 3.3 Syllable model
 
 Parse the buffer into `onset · nucleus · coda`. `qu` and `gi` are onsets, not vowel
@@ -385,7 +398,7 @@ tests/corpus/telex-case.tsv      case handling: lower, Title, upper, mixed
 tests/corpus/telex-case-old.tsv  case handling with old tone placement
 tests/corpus/vni-new.tsv         VNI: digits, tones, placement, words
 tests/corpus/vni-old.tsv         VNI with old tone placement
-tests/corpus/simple-telex-new.tsv  planned, T1.8
+tests/corpus/simple-telex-new.tsv  Simple Telex: circumflex, stroke, `w` for `ư`, tones
 scripts/corpus_tool.py          planned; Python 3.14 stdlib only: sort, dedupe, validate TSV
 ```
 
@@ -406,8 +419,7 @@ File names select the configuration: `method[-topic][-style].tsv`, where method 
 `telex`, `simple-telex` or `vni`, style is `old` or `new`, and the topic is free
 text the runner ignores. A missing style means the default (`new`). So
 `telex-letters.tsv` runs full Telex with the new style, `telex-tone-old.tsv` runs
-tone cases with old placement, and `simple-telex-old.tsv` runs Simple Telex with
-that style.
+tone cases with old placement, and `vni-old.tsv` runs VNI with that style.
 
 The runner feeds each input character as `Input::Char`, then `Input::Boundary`, and compares the concatenation of `commit` values *after* honouring `backspaces`, for both the character actions and the boundary action: a case can express a modifier that rewrites an earlier character, and `auto_restore` giving the word back. Whitespace inside an input ends the word there, so `asd asd` is two words. Uppercase and mixed case are explicit cases, not implicit behaviour.
 

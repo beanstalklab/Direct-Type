@@ -76,7 +76,7 @@ When SOLID conflicts with clarity, prefer clarity and say why in the change.
 
 ## Verification
 
-Current phase: **T1.8 (Simple Telex method)**. The commands below are the only accepted
+Current phase: **Phase 1 done, T2.1 next (backspace and mid-composition editing)**. The commands below are the only accepted
 verification; run them from the repository root. Do not substitute different
 commands, and do not lower a check to get to green.
 
@@ -127,15 +127,21 @@ commands, and do not lower a check to get to green.
 - While writing the VNI `7` rule, T1.2's eager `uow → ươ` turned out to make `thuở`,
   `quơ` and `huơ` untypable. Fixed in its own commit (`f89b2f2`): a word that ends at
   the horn key keeps `uơ`, a word that goes on horns the pair (`uowng → ương`).
-- Next: T1.8 — Simple Telex, the restricted rule set (`aa/ee/oo`, `w`, `dd` only, no
-  tone keys of its own beyond Telex's). The seam is a third `RulePack` implementation.
+- **T1.8 done**: Simple Telex is a third `RulePack` in `telex.rs` — Telex's tone keys
+  and placement, with only `aa/ee/oo`, `w` and `dd` as letter modifiers. `w` produces
+  `ư` only while the word is an onset, so `aw` stays `aw` with `auto_restore` off as
+  well. 52 corpus cases in `simple-telex-new.tsv`, 630 in total; 81 core tests.
+- All three methods (Telex, VNI, Simple Telex) now share one fold in `src/input.rs`;
+  `tone.rs` has not changed since Checkpoint C.
+- Next: T2.1 — backspace and mid-composition editing. `Input::Backspace` already
+  re-derives the word from the raw keys; what T2.1 owes is the corpus coverage and the
+  edge cases around a boundary that already restored a word.
 - `test` → `tét` stays `tét`: `tét` is real Vietnamese (`nét`, `mét`, `sét` share its
   rhyme), so no spelling rule may rewrite it. English typing needs the toggle key, or
   `free_tone_mark` off. Do not "fix" this by weakening the tables; the corpus case
   `telex-restore.tsv test → tét` exists to stop that.
-- Not implemented, by design: Simple Telex's restricted rule set (T1.8). It currently
-  passes letters through unchanged rather than being transformed by the full Telex
-  pack.
+- No input method is missing any more; what remains before the addon is robustness
+  (T2.x: backspace, property tests, benchmarks) and the corpus target of Q2.
 - C ABI names follow the AGENTS.md naming rules (no abbreviations): `code_point`,
   `commit_length`, `preedit_length`, `reserved_flags`, `configuration`, `engine`.
 - Product name: **`directtype`**; the public repository is

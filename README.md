@@ -18,13 +18,13 @@ Pre-alpha. What exists today:
   composition buffer. Telex letters and tone keys work, including old/new tone
   placement and `free_tone_mark`; `auto_restore` and `spell_check` work on a closed
   onset/nucleus/coda spelling test; case is per letter, so `VIEEJT`, `Vieejt` and
-  `vIeejt` come out as `VIỆT`, `Việt` and `vIệt`. VNI works from its own rule pack
-  (digits `1`–`5`, `0`, `6`–`9`). Simple Telex's restricted rule set is **not
-  implemented yet**.
+  `vIeejt` come out as `VIỆT`, `Việt` and `vIệt`. Three methods work from one shared
+  fold: Telex, VNI (digits `1`–`5`, `0`, `6`–`9`) and Simple Telex (`aa/ee/oo`, `w`,
+  `dd` and the Telex tones).
 - `crates/viet-cli` — `viet-cli type` and `viet-cli check` (golden-corpus runner,
   exit codes `0`/`1`/`2`).
 - `crates/viet-ffi` — a C ABI over the engine, with panics contained at the boundary.
-- 579 corpus cases and CI that runs formatting, lint, tests and the corpus.
+- 630 corpus cases and CI that runs formatting, lint, tests and the corpus.
 
 There is no fcitx5 addon, no installer, and nothing to install yet.
 

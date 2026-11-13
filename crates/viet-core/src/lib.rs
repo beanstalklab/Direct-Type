@@ -241,12 +241,8 @@ impl Engine {
             Method::Vni => {
                 input::apply::<vni::Vni>(&self.raw_keys, &self.config, &mut self.scratch)
             }
-            // Simple Telex has a narrower modifier set (T1.8): until it lands, its
-            // words reach the application unchanged rather than half-transformed by
-            // the full Telex rule pack.
             Method::SimpleTelex => {
-                self.scratch.clear();
-                self.scratch.push_str(&self.raw_keys);
+                input::apply::<telex::SimpleTelex>(&self.raw_keys, &self.config, &mut self.scratch)
             }
         }
         // `spell_check` refuses a transformation the word can no longer justify, so
@@ -835,14 +831,23 @@ mod tests {
     }
 
     #[test]
-    fn unimplemented_methods_pass_letters_through() {
-        // T1.8 will give Simple Telex its narrower rule set; until then the engine
-        // must not apply Telex rules under another method's name.
-        let mut engine = Engine::new(Config {
-            method: Method::SimpleTelex,
-            ..Config::default()
-        });
-        assert_eq!(typed_text(&mut engine, "aa"), "aa");
+    fn simple_telex_is_telex_without_the_horn_and_breve_shortcuts() {
+        // The circumflex, the stroke and the tones come from the same rules…
+        for (raw, expected) in [("aa", "â"), ("dd", "đ"), ("vieejt", "việt")] {
+            let mut engine = Engine::new(Config {
+                method: Method::SimpleTelex,
+                ..Config::default()
+            });
+            assert_eq!(typed_text(&mut engine, raw), expected, "raw {raw:?}");
+        }
+        // …and the shortcuts this method leaves out stay literal keys.
+        for raw in ["aw", "ow", "uw", "uow", "[", "]"] {
+            let mut engine = Engine::new(Config {
+                method: Method::SimpleTelex,
+                ..Config::default()
+            });
+            assert_eq!(typed_text(&mut engine, raw), raw, "raw {raw:?}");
+        }
     }
 
     #[test]

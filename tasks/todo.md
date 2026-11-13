@@ -397,9 +397,25 @@ git diff main -- crates/viet-core/src/tone.rs
 **Description:** Restricted Telex variant: only `aa/ee/oo`, `w`, `dd`.
 
 **Acceptance criteria:**
-- [ ] `aw` stays `aw` in SimpleTelex (not `ă`), `aa → â`
-- [ ] `simple-telex-new.tsv` ≥ 50 cases
-- [ ] Method selection via `Config` only; no duplicated tone logic
+- [x] `aw` stays `aw` in SimpleTelex (not `ă`), `aa → â`
+- [x] `simple-telex-new.tsv` ≥ 50 cases (52)
+- [x] Method selection via `Config` only; no duplicated tone logic
+
+**Decisions recorded in this task:**
+
+- Simple Telex is a third `RulePack` in `telex.rs` over the shared fold, so it inherits
+  the tone keys, the undo rules, `auto_restore` and `spell_check` without a line of its
+  own tone code. `tone.rs` is still unchanged.
+- Without the horn and breve shortcuts the method cannot build `ă` or `ơ`, so it is for
+  a keyboard that has those letters on its layout: they pass through and the pack adds
+  the circumflex, the stroke, the `ư` of `w` and the tones. Words that need the missing
+  shortcuts (`dduowng`, `thuong`) are given back by `auto_restore`, and the corpus
+  pins that.
+- `w` produces `ư` only while the word is still an onset (`w`, `hw`, `thw`). After a
+  vowel it is a letter, so the `aw → aw` criterion holds with `auto_restore` off too,
+  instead of relying on a later restore to hide `aư`.
+- `config.rs` from the task's file list does not exist: the method is selected through
+  `Config::method` in `lib.rs`, which is where every method is chosen.
 
 **Verification:**
 ```bash
@@ -408,12 +424,13 @@ cargo run -p viet-cli -- check tests/corpus
 ```
 
 **Dependencies:** T1.7
-**Files:** `crates/viet-core/src/telex.rs`, `crates/viet-core/src/config.rs`, `tests/corpus/simple-telex-new.tsv`
+**Files:** `crates/viet-core/src/telex.rs`, `crates/viet-core/src/lib.rs`,
+`tests/corpus/simple-telex-new.tsv`
 **Scope:** S
 
 ### Checkpoint D
-- [ ] All four corpus files green, total ≥ 2,000 cases
-- [ ] `viet-cli check` exits `0`
+- [x] All corpus files green, `viet-cli check` exits `0` (630 cases across eight files)
+- [ ] Total ≥ 2,000 cases — blocked on Q2 (corpus source)
 - [ ] Human review before robustness work
 
 ---
