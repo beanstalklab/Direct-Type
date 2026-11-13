@@ -14,14 +14,14 @@ Pre-alpha. What exists today:
 
 - `crates/viet-core` — the pure transformation engine. Characters commit
   immediately; the raw word is tracked and re-derived on every key, so a Telex
-  letter modifier rewrites what the application already shows (`aa` → `â`) without
-  a composition buffer. Telex letter modifiers work, and the syllable parser plus
-  tone-placement rules are in place; tone keys, VNI and Simple Telex's restricted
-  rule set are **not implemented yet**.
+  modifier rewrites what the application already shows (`aa` → `â`) without a
+  composition buffer. Telex letters and tone keys work, including old/new tone
+  placement and `free_tone_mark`; auto-restore, spell-check, VNI and Simple Telex's
+  restricted rule set are **not implemented yet**.
 - `crates/viet-cli` — `viet-cli type` and `viet-cli check` (golden-corpus runner,
   exit codes `0`/`1`/`2`).
 - `crates/viet-ffi` — a C ABI over the engine, with panics contained at the boundary.
-- 56 corpus cases and CI that runs formatting, lint, tests and the corpus.
+- 230 corpus cases and CI that runs formatting, lint, tests and the corpus.
 
 There is no fcitx5 addon, no installer, and nothing to install yet.
 
@@ -41,8 +41,17 @@ $ cargo run -p viet-cli -- type --method telex "dduowng"
 đương
 ```
 
-Tone keys are not implemented yet, so `vieejt` still comes out as `viêjt` rather
-than `việt`. Checkpoint B in `tasks/plan.md` is when that changes.
+Tone keys work too, so the whole word comes out at once:
+
+```console
+$ cargo run -p viet-cli -- type --method telex "vieejt"
+việt
+```
+
+Auto-restore is not implemented yet: until it is, a word that never becomes one
+syllable keeps its tone keys as letters (`ashello` → `ashello`), and an English word
+that happens to contain a tone key is transformed the way Telex defines it
+(`test` → `tét`). T1.5 in `tasks/todo.md` is when that changes.
 
 ## Documentation
 

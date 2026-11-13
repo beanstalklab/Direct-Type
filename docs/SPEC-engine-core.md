@@ -123,6 +123,22 @@ Keys arrive as characters, not keysyms. `ime-addon` maps keysyms → `char` (inc
 
 Doubling a tone key removes the tone and keeps the letter (`ass → as`, `a11 → a1` in VNI semantics must be defined by corpus, not guessed).
 
+Tone keys in Telex, in the detail T1.4 pinned down:
+
+- A tone key is a letter until it is inside a syllable: `sz → sz`, `telex → telex`,
+  and a word that never becomes one syllable keeps every tone key as a letter
+  (`ashello → ashello`).
+- A later tone key replaces the tone instead of adding a second one: `asf → à`,
+  `asfrxj → ạ`.
+- The mark is placed once the word is complete, from the syllable §3.4 describes, so
+  it moves when the word grows: `toasn → toán` (the mark typed on `toa` ends up on
+  `a` after `n` arrives).
+- Doubling a tone key undoes it and keeps the letter: `ass → as`, `aass → âs`,
+  `toanss → toans`.
+- `z` removes the tone and puts the tone key's letter back where it was typed, which
+  is the same rule as doubling seen from the other side: `asz → as`, `asdz → asd`,
+  `toansz → toans`. With no tone to remove, `z` is a letter (`az → az`).
+
 Letter modifiers in Telex, in the detail T1.2 pinned down:
 
 - Doubling undoes the modifier and keeps the key literal: `aaa → aa`, `ddd → dd`, `ww → w`, `uoww → uow`.
@@ -158,6 +174,14 @@ Order of rules:
 3. Otherwise (open syllable): one vowel → that vowel; two → first (`cái`, `của`); three → second (`khuỷu`).
 4. `ToneStyle::Old` vs `New` changes only the `oa / oe / uy` open-syllable case (`hoà` vs `hòa`, `thuỷ` vs `thủy`). Every other open pair keeps the first vowel under both styles: `cái` and `của` must not move.
 
+`free_tone_mark` decides *when* a tone key is accepted, not where the mark goes:
+
+- On (default): a tone key is a modifier anywhere inside the syllable, and the mark is
+  placed from the finished syllable, so `toasn` and `toans` both reach `toán`.
+- Off: a tone key is a modifier only after the last letter of the word, which is what
+  Telex users call "the mark at the end". `vieetj` is `việt`, `vieejt` keeps the `j` as
+  a letter (`viêjt`), and `toasn` keeps its `s` (`toasn`).
+
 Every rule above must be backed by at least three corpus cases, including a counter-example. If implementation and corpus disagree, the corpus wins only when it cites a source in its comment.
 
 ### 3.5 Commit and restore
@@ -168,7 +192,8 @@ Every rule above must be backed by at least three corpus cases, including a coun
   only ever receives committed text, never a composition buffer.
 - Word boundary: commit the transformed buffer, clear state, `boundary = true`.
 - Invalid syllable + `auto_restore` → commit the raw keystrokes exactly as typed.
-- Invalid syllable + `!auto_restore` → commit the best transformed attempt.
+- Invalid syllable + `!auto_restore` → commit the best transformed attempt, which for
+  Telex today is the letter transformation with every tone key kept literal.
 - `spell_check` on: a buffer that cannot become a valid Vietnamese syllable is passed through untouched.
 - Backspace during composition removes the last *raw* key, then re-derives the transformation from scratch. This is why the engine keeps the raw key sequence alongside the transformed text.
 
@@ -181,7 +206,6 @@ Run from the repository root. `cargo` is user-local on this host, so source
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-cargo test -p viet-core --test corpus -- --nocapture
 cargo run -p viet-cli -- type --method telex --tone-style new "vieejt"
 cargo run -p viet-cli -- check tests/corpus
 cargo bench -p viet-core            # after the first correctness milestone
@@ -195,27 +219,26 @@ cargo bench -p viet-core            # after the first correctness milestone
 Cargo.toml                      workspace: members = crates/*
 rust-toolchain.toml             pinned stable + clippy + rustfmt
 crates/viet-core/
-  src/lib.rs                    public API, Engine, Action
-  src/config.rs                 Config, Method, ToneStyle
-  src/input.rs                  Input classification, tone/modifier keys
-  src/buffer.rs                 raw key sequence + transformed view
-  src/syllable.rs               onset/medial/nucleus/coda parsing + validity
+  src/lib.rs                    public API: Config, Method, ToneStyle, Input, Action, Engine
+  src/syllable.rs               onset/nucleus/coda parsing (structure only)
   src/tone.rs                   tone placement rules 3.4
-  src/telex.rs
-  src/vni.rs
-  src/unicode.rs               Vietnamese precomposed table, case handling
-  tests/corpus.rs               runs tests/corpus/*.tsv through the engine
-  tests/invariants.rs           property tests
-  fuzz/                         cargo-fuzz target (dev only)
+  src/telex.rs                  Telex fold: letter modifiers and tone keys
+  src/unicode.rs                Vietnamese precomposed table, case handling
+  src/vni.rs                    planned, T1.7
+  tests/invariants.rs           property tests, T2.2
+  fuzz/                         cargo-fuzz target, T2.2 (dev only)
 crates/viet-cli/src/main.rs
+crates/viet-cli/src/corpus.rs   corpus runner behind `viet-cli check`
 crates/viet-ffi/
   src/lib.rs
   include/viet.h
-tests/corpus/telex-new.tsv       filename = method + tone style
-tests/corpus/telex-old.tsv
-tests/corpus/simple-telex-new.tsv
-tests/corpus/vni-new.tsv
-scripts/corpus_tool.py          Python 3.14 stdlib only: sort, dedupe, validate TSV
+tests/corpus/telex-new.tsv       passthrough cases
+tests/corpus/telex-letters.tsv   letter modifiers
+tests/corpus/telex-tone.tsv      tone keys, new tone style
+tests/corpus/telex-tone-old.tsv  tone keys, old tone style
+tests/corpus/simple-telex-new.tsv  planned, T1.8
+tests/corpus/vni-new.tsv           planned, T1.7
+scripts/corpus_tool.py          planned; Python 3.14 stdlib only: sort, dedupe, validate TSV
 ```
 
 `tests/corpus` lives at the workspace root, not inside `viet-core`, because the addon's integration tests will reuse it.
@@ -234,9 +257,9 @@ quyeenf	quyền
 File names select the configuration: `method[-topic][-style].tsv`, where method is
 `telex`, `simple-telex` or `vni`, style is `old` or `new`, and the topic is free
 text the runner ignores. A missing style means the default (`new`). So
-`telex-letters.tsv` runs full Telex with the new style, `telex-new.tsv` runs the
-same configuration for tone cases, and `simple-telex-old.tsv` runs Simple Telex
-with old placement.
+`telex-letters.tsv` runs full Telex with the new style, `telex-tone-old.tsv` runs
+tone cases with old placement, and `simple-telex-old.tsv` runs Simple Telex with
+that style.
 
 The runner feeds each input character as `Input::Char`, then `Input::Boundary`, and compares the concatenation of `commit` values *after* honouring `backspaces`, so a case can express a modifier that rewrites an earlier character. Uppercase and mixed case are explicit cases, not implicit behaviour.
 

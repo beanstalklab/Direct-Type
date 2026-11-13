@@ -4,11 +4,11 @@
 //! should do. This crate must never depend on fcitx5, GTK, Qt, X11, Wayland, the
 //! filesystem, or the environment. See `docs/SPEC-engine-core.md`.
 //!
-//! Status: Telex letter modifiers work (T1.2). Characters are committed
+//! Status: Telex letters and tone keys work (T1.2, T1.4). Characters are committed
 //! immediately and never held in a preedit buffer, so a modifier rewrites what the
-//! application already shows instead of building a composition string. Tone keys
-//! (T1.4), VNI (T1.7) and Simple Telex's restricted modifier set (T1.8) are not
-//! implemented yet.
+//! application already shows instead of building a composition string. `auto_restore`
+//! and `spell_check` are still switches without behaviour (T1.5); VNI (T1.7) and
+//! Simple Telex's restricted modifier set (T1.8) are not implemented yet.
 
 #![forbid(unsafe_code)]
 
@@ -193,7 +193,7 @@ impl Engine {
     /// Put the transformation of the current word into `scratch`.
     fn transform_into_scratch(&mut self) {
         match self.config.method {
-            Method::Telex => telex::apply_letter_modifiers(&self.raw_keys, &mut self.scratch),
+            Method::Telex => telex::apply_telex(&self.raw_keys, &self.config, &mut self.scratch),
             // Simple Telex has a narrower modifier set (T1.8) and VNI uses digit
             // keys (T1.7). Until those land, their words reach the application
             // unchanged rather than half-transformed by the wrong rule pack.
@@ -315,6 +315,166 @@ mod tests {
     }
 
     #[test]
+    fn tone_key_replaces_the_vowel_already_committed() {
+        let mut engine = engine();
+        engine.feed(Input::Char('a'));
+        let action = engine.feed(Input::Char('s'));
+        assert!(action.consumed);
+        assert_eq!(action.backspaces, 1);
+        assert_eq!(action.commit, "á");
+    }
+
+    #[test]
+    fn tone_keys_mark_the_vowel_the_syllable_rules_choose() {
+        let cases = [
+            ("as", "á"),
+            ("vieejt", "việt"),
+            ("toans", "toán"),
+            ("tieengs", "tiếng"),
+            ("dduowngf", "đường"),
+            ("quyeenf", "quyền"),
+            ("chuyeenf", "chuyền"),
+            ("nguyeenx", "nguyễn"),
+        ];
+        for (raw, expected) in cases {
+            assert_eq!(typed_text(&mut engine(), raw), expected, "raw {raw:?}");
+        }
+    }
+
+    #[test]
+    fn a_later_tone_key_replaces_the_tone() {
+        let cases = [
+            ("af", "à"),
+            ("asf", "à"),
+            ("asfr", "ả"),
+            ("asfrx", "ã"),
+            ("asfrxj", "ạ"),
+        ];
+        for (raw, expected) in cases {
+            assert_eq!(typed_text(&mut engine(), raw), expected, "raw {raw:?}");
+        }
+    }
+
+    #[test]
+    fn doubling_a_tone_key_removes_the_tone_and_keeps_the_letter() {
+        let cases = [("ass", "as"), ("aass", "âs"), ("toanss", "toans")];
+        for (raw, expected) in cases {
+            assert_eq!(typed_text(&mut engine(), raw), expected, "raw {raw:?}");
+        }
+    }
+
+    #[test]
+    fn z_removes_the_tone_and_keeps_the_tone_key_as_a_letter() {
+        // The tone key returns to the position where it was typed, not to the end,
+        // so a removal in the middle of a word restores the original spelling.
+        let cases = [("asz", "as"), ("asdz", "asd"), ("toansz", "toans")];
+        for (raw, expected) in cases {
+            assert_eq!(typed_text(&mut engine(), raw), expected, "raw {raw:?}");
+        }
+    }
+
+    #[test]
+    fn free_tone_mark_accepts_the_mark_before_the_coda() {
+        // With the default setting the mark may be typed as soon as a vowel exists;
+        // adding the coda afterwards moves it to the position the rules dictate.
+        let cases = [
+            ("vieejt", "việt"),
+            ("vieetj", "việt"),
+            ("toasn", "toán"),
+            ("hoasn", "hoán"),
+        ];
+        for (raw, expected) in cases {
+            assert_eq!(typed_text(&mut engine(), raw), expected, "raw {raw:?}");
+        }
+    }
+
+    #[test]
+    fn without_free_tone_mark_the_mark_must_follow_the_last_letter() {
+        let mut engine = Engine::new(Config {
+            free_tone_mark: false,
+            ..Config::default()
+        });
+        // `j` before the final `t` stays a letter, because the mark has to come last.
+        assert_eq!(typed_text(&mut engine, "vieejt"), "viêjt");
+        let mut engine = Engine::new(Config {
+            free_tone_mark: false,
+            ..Config::default()
+        });
+        assert_eq!(typed_text(&mut engine, "vieetj"), "việt");
+        let mut engine = Engine::new(Config {
+            free_tone_mark: false,
+            ..Config::default()
+        });
+        assert_eq!(typed_text(&mut engine, "toans"), "toán");
+    }
+
+    #[test]
+    fn tone_style_chooses_the_placement_of_oa_oe_uy() {
+        let cases = [
+            (ToneStyle::New, "hoaf", "hòa"),
+            (ToneStyle::New, "thuyr", "thủy"),
+            (ToneStyle::Old, "hoaf", "hoà"),
+            (ToneStyle::Old, "thuyr", "thuỷ"),
+        ];
+        for (tone_style, raw, expected) in cases {
+            let mut engine = Engine::new(Config {
+                tone_style,
+                ..Config::default()
+            });
+            assert_eq!(
+                typed_text(&mut engine, raw),
+                expected,
+                "raw {raw:?} with {tone_style:?}"
+            );
+        }
+        // Counter-examples: every other open pair keeps the first vowel.
+        for tone_style in [ToneStyle::New, ToneStyle::Old] {
+            for (raw, expected) in [("cais", "cái"), ("cuar", "của")] {
+                let mut engine = Engine::new(Config {
+                    tone_style,
+                    ..Config::default()
+                });
+                assert_eq!(
+                    typed_text(&mut engine, raw),
+                    expected,
+                    "raw {raw:?} with {tone_style:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_tone_key_without_a_vowel_is_a_letter() {
+        // The tone keys are letters of the alphabet: outside a syllable they must
+        // reach the application unchanged, and a word that never becomes one
+        // syllable keeps every keystroke.
+        let cases = [
+            ("sz", "sz"),
+            ("z", "z"),
+            ("test", "tét"),
+            ("telex", "telex"),
+            ("ashello", "ashello"),
+        ];
+        for (raw, expected) in cases {
+            assert_eq!(typed_text(&mut engine(), raw), expected, "raw {raw:?}");
+        }
+    }
+
+    #[test]
+    fn tone_key_case_follows_the_vowel_carrying_the_mark() {
+        let cases = [
+            ("AS", "Á"),
+            ("As", "Á"),
+            ("aS", "á"),
+            ("VIEEJT", "VIỆT"),
+            ("Vieejt", "Việt"),
+        ];
+        for (raw, expected) in cases {
+            assert_eq!(typed_text(&mut engine(), raw), expected, "raw {raw:?}");
+        }
+    }
+
+    #[test]
     fn boundary_ends_the_word_and_clears_the_transformation() {
         let mut engine = engine();
         assert_eq!(typed_text(&mut engine, "aa"), "â");
@@ -374,8 +534,13 @@ mod tests {
     #[test]
     fn buffers_stabilize_after_warmup() {
         let mut engine = engine();
+        // One word with letter modifiers and a tone (`dduowngf`), one that removes a
+        // tone and gets its key back (`asdz`): the paths that rewrite and re-insert
+        // characters must not grow the buffers either.
         for _ in 0..100 {
-            typed_text(&mut engine, "thuowng");
+            typed_text(&mut engine, "dduowngf");
+            engine.reset();
+            typed_text(&mut engine, "asdz");
             engine.reset();
         }
         let warmed_up = (
@@ -385,7 +550,9 @@ mod tests {
         );
 
         for _ in 0..1_000 {
-            typed_text(&mut engine, "thuowng");
+            typed_text(&mut engine, "dduowngf");
+            engine.reset();
+            typed_text(&mut engine, "asdz");
             engine.reset();
         }
         assert_eq!(

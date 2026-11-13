@@ -1,11 +1,20 @@
-//! Telex letter modifiers (spec §3.2).
+//! Telex transformation (spec §3.2 for letters and §3.4 for tones).
 //!
 //! The transformation is a fold over the raw keystrokes of one word, so a modifier
 //! can rewrite a character the application has already committed: the caller
 //! derives the delete-and-replace action from the difference. Nothing here holds a
 //! composition buffer, which is what removes the underline.
+//!
+//! Letter modifiers rewrite the word as it is typed. A tone is different: which
+//! vowel carries it depends on the whole syllable, so a tone key only records
+//! *which* tone is wanted and the mark is placed once the word is complete. That is
+//! also what lets `toasn` reach `toán`: the mark typed before the coda moves when
+//! the coda arrives.
 
-use crate::unicode::{base_letter, compose, LetterMark};
+use crate::syllable::parse;
+use crate::tone::tone_index;
+use crate::unicode::{base_letter, compose, with_tone, LetterMark, Tone};
+use crate::{Config, ToneStyle};
 
 /// Where the trailing letter of the transformed word came from.
 ///
@@ -27,20 +36,186 @@ enum Origin {
     },
 }
 
-/// Rewrite `output` to be the Telex letter transformation of `raw_keystrokes`.
+/// A tone a tone key asked for, waiting for the word to be complete.
+#[derive(Debug, Clone, Copy)]
+struct PendingTone {
+    tone: Tone,
+    /// Character position where the keystroke itself belongs if the tone is removed
+    /// again: `asz` keeps the `s`, and in `asdz` that `s` returns before the `d`.
+    letter_position: usize,
+    letter: char,
+}
+
+/// Rewrite `output` to be the Telex transformation of `raw_keystrokes`.
 ///
 /// `output` is cleared first and keeps its capacity, so a warmed-up engine does not
 /// allocate per keystroke.
-pub(crate) fn apply_letter_modifiers(raw_keystrokes: &str, output: &mut String) {
+pub(crate) fn apply_telex(raw_keystrokes: &str, config: &Config, output: &mut String) {
+    if fold(raw_keystrokes, config, true, output) {
+        return;
+    }
+    // The finished word is not one syllable, so its tone keys were letters after
+    // all: derive again with every one of them literal. That also keeps every
+    // keystroke visible, which is the best attempt §3.5 asks for until T1.5 adds
+    // `auto_restore`.
+    fold(raw_keystrokes, config, false, output);
+}
+
+/// Fold `raw_keystrokes` into `output`.
+///
+/// `tone_keys_act` is false for the retry described in [`apply_telex`]: every tone
+/// key is then an ordinary letter. The result is final when no tone is left
+/// unplaced, which is what the bool reports.
+fn fold(raw_keystrokes: &str, config: &Config, tone_keys_act: bool, output: &mut String) -> bool {
     output.clear();
+    let last_letter_position = last_letter_position(raw_keystrokes);
     let mut origin = Origin::Literal;
-    for key in raw_keystrokes.chars() {
-        origin = append_key(output, key, origin);
+    let mut pending_tone: Option<PendingTone> = None;
+    let mut previous_tone_key: Option<char> = None;
+
+    for (position, key) in raw_keystrokes.chars().enumerate() {
+        let tone_key_acts = tone_keys_act
+            && mark_may_be_typed_here(config.free_tone_mark, position, last_letter_position);
+        if tone_key_acts && apply_tone_key(output, key, &mut pending_tone, &mut previous_tone_key) {
+            // A tone key changes no letter, so a following letter modifier starts
+            // from a literal trailing letter.
+            origin = Origin::Literal;
+            continue;
+        }
+        origin = append_letter(output, key, origin);
+        previous_tone_key = None;
+    }
+
+    match pending_tone {
+        None => true,
+        Some(pending) => place_tone(output, pending.tone, config.tone_style),
     }
 }
 
-/// Apply one keystroke and report how the trailing letter now came about.
-fn append_key(output: &mut String, key: char, origin: Origin) -> Origin {
+/// Handle one tone key. Returns whether it acted as a modifier.
+///
+/// A tone key is a letter until it is inside a syllable (`sz` keeps its `s`), and
+/// doubling undoes it instead of applying a second tone (`ass → as`).
+fn apply_tone_key(
+    output: &mut String,
+    key: char,
+    pending_tone: &mut Option<PendingTone>,
+    previous_tone_key: &mut Option<char>,
+) -> bool {
+    if let Some(tone) = tone_of_key(key) {
+        if parse(output.as_str()).is_none() {
+            return false;
+        }
+        if *previous_tone_key == Some(key) {
+            restore_tone_key_letter(output, pending_tone);
+            *previous_tone_key = None;
+            return true;
+        }
+        *pending_tone = Some(PendingTone {
+            tone,
+            letter_position: output.chars().count(),
+            letter: key,
+        });
+        *previous_tone_key = Some(key);
+        return true;
+    }
+    if is_tone_remover(key) && pending_tone.is_some() {
+        restore_tone_key_letter(output, pending_tone);
+        *previous_tone_key = None;
+        return true;
+    }
+    false
+}
+
+/// Whether a tone key at `position` may act.
+///
+/// With `free_tone_mark` the mark may be typed anywhere inside the syllable. Without
+/// it the mark has to follow the last letter of the word, which in Telex means after
+/// the coda: `vieejt` stays `viêjt` while `vieetj` is `việt`.
+fn mark_may_be_typed_here(
+    free_tone_mark: bool,
+    position: usize,
+    last_letter_position: Option<usize>,
+) -> bool {
+    if free_tone_mark {
+        return true;
+    }
+    match last_letter_position {
+        Some(last) => position > last,
+        None => true,
+    }
+}
+
+/// The tone a Telex key asks for, in either case.
+fn tone_of_key(key: char) -> Option<Tone> {
+    match key.to_ascii_lowercase() {
+        's' => Some(Tone::Acute),
+        'f' => Some(Tone::Grave),
+        'r' => Some(Tone::HookAbove),
+        'x' => Some(Tone::Tilde),
+        'j' => Some(Tone::UnderDot),
+        _ => None,
+    }
+}
+
+/// `z` removes whatever tone the word carries.
+fn is_tone_remover(key: char) -> bool {
+    key.eq_ignore_ascii_case(&'z')
+}
+
+/// Position of the last raw key that is a letter rather than a tone key.
+///
+/// Only `free_tone_mark` off needs it, and it is the reason that setting can be
+/// decided from the raw keystrokes alone instead of from the typing history.
+fn last_letter_position(raw_keystrokes: &str) -> Option<usize> {
+    raw_keystrokes
+        .chars()
+        .enumerate()
+        .filter(|(_, key)| tone_of_key(*key).is_none() && !is_tone_remover(*key))
+        .map(|(position, _)| position)
+        .last()
+}
+
+/// Put the letter of the tone key that asked for the pending tone back where the key
+/// was typed, and forget the tone.
+fn restore_tone_key_letter(output: &mut String, pending_tone: &mut Option<PendingTone>) {
+    let Some(pending) = pending_tone.take() else {
+        return;
+    };
+    match output.char_indices().nth(pending.letter_position) {
+        Some((byte_index, _)) => output.insert(byte_index, pending.letter),
+        None => output.push(pending.letter),
+    }
+}
+
+/// Put `tone` on the vowel the syllable rules choose.
+///
+/// Returns false when the word is not one syllable, which is how the caller learns
+/// that its tone keys were letters.
+fn place_tone(output: &mut String, tone: Tone, tone_style: ToneStyle) -> bool {
+    let Some(syllable) = parse(output.as_str()) else {
+        return false;
+    };
+    let Some(index) = tone_index(&syllable, tone_style) else {
+        return false;
+    };
+    let Some((byte_index, character)) = output.char_indices().nth(syllable.onset_length + index)
+    else {
+        return false;
+    };
+    let Some(toned) = with_tone(character, tone) else {
+        return false;
+    };
+    let mut encoded = [0u8; 4];
+    output.replace_range(
+        byte_index..byte_index + character.len_utf8(),
+        toned.encode_utf8(&mut encoded),
+    );
+    true
+}
+
+/// Apply one letter keystroke and report how the trailing letter now came about.
+fn append_letter(output: &mut String, key: char, origin: Origin) -> Origin {
     match key {
         // `[` and `]` are letters in their own right: §3.2 lists them as `ơ` and
         // `ư`, never as a change to a preceding letter, unlike `aw → ă`.
@@ -234,7 +409,7 @@ mod tests {
 
     fn transform(raw_keystrokes: &str) -> String {
         let mut output = String::new();
-        apply_letter_modifiers(raw_keystrokes, &mut output);
+        apply_telex(raw_keystrokes, &Config::default(), &mut output);
         output
     }
 
@@ -307,5 +482,38 @@ mod tests {
         assert_eq!(transform("awa"), "ăa");
         // `ô` cannot take a horn.
         assert_eq!(transform("oow"), "ôw");
+    }
+
+    #[test]
+    fn tone_keys_place_the_mark_once_the_word_is_complete() {
+        // The tone key is typed before the coda, so at that moment only `toa`
+        // exists; the mark has to move to the last nucleus vowel when `n` arrives.
+        assert_eq!(transform("toasn"), "toán");
+        assert_eq!(transform("vieejt"), "việt");
+    }
+
+    #[test]
+    fn a_tone_key_outside_a_syllable_is_a_letter() {
+        assert_eq!(transform("sz"), "sz");
+        assert_eq!(transform("telex"), "telex");
+    }
+
+    #[test]
+    fn a_tone_that_cannot_be_placed_keeps_every_keystroke() {
+        // `ashello` is not one syllable, so `s` was a letter and must not vanish.
+        assert_eq!(transform("ashello"), "ashello");
+    }
+
+    #[test]
+    fn without_free_tone_mark_only_a_trailing_mark_acts() {
+        let mut output = String::new();
+        let config = Config {
+            free_tone_mark: false,
+            ..Config::default()
+        };
+        apply_telex("vieejt", &config, &mut output);
+        assert_eq!(output, "viêjt");
+        apply_telex("vieetj", &config, &mut output);
+        assert_eq!(output, "việt");
     }
 }

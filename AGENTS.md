@@ -76,7 +76,7 @@ When SOLID conflicts with clarity, prefer clarity and say why in the change.
 
 ## Verification
 
-Current phase: **T1.4 (Telex tone keys)**. The commands below are the only accepted
+Current phase: **T1.5 (auto-restore and spell-check)**. The commands below are the only accepted
 verification; run them from the repository root. Do not substitute different
 commands, and do not lower a check to get to green.
 
@@ -90,17 +90,22 @@ commands, and do not lower a check to get to green.
   `viet-cli check` work with exit codes `0/1/2`, and CI runs the corpus check.
 - **T1.2 done**: Telex letter modifiers (`aa/ee/oo`, `w`, `aw/ow/uw`, `dd`, `[`, `]`,
   `uow → ươ`) with doubling to undo; a modifier reports `backspaces` and rewrites
-  text the application already shows. 56 corpus cases, CI green.
+  text the application already shows.
 - **T1.3 done**: `syllable::parse` (onset/nucleus/coda, `qu` and `gi` as onsets,
   fixed-array so it never allocates) and `tone::tone_index` (quality diacritic, coda,
-  then open-syllable rules; `oa/oe/uy` are the only style-dependent pairs). Not
-  wired into the engine yet: both modules carry a scoped `#![allow(dead_code)]` that
-  T1.4 must remove. 35 core tests, CI green.
-- Next: T1.4 — tone keys `s f r x j`, `z` removes a tone, `free_tone_mark`.
-  Checkpoint B (`vieejt` → `việt`) closes with it.
-- Not implemented, by design: tone keys (T1.4), auto-restore and spell-check (T1.5),
-  case matrix (T1.6), VNI (T1.7), Simple Telex's restricted rule set (T1.8). Those
-  methods currently pass letters through unchanged.
+  then open-syllable rules; `oa/oe/uy` are the only style-dependent pairs).
+- **T1.4 done**: Telex tone keys `s f r x j`, `z` and tone-key doubling remove a tone,
+  `free_tone_mark` on (default) and off, old/new placement. The mark is placed from
+  the finished syllable, so `toasn → toán`; a tone key outside a syllable stays a
+  letter (`sz → sz`) and a word that never becomes one syllable keeps every keystroke
+  (`ashello`). 230 corpus cases (152 tone cases + 22 old-style tone cases), 51 core
+  tests. Checkpoint B (`vieejt` → `việt`) closed.
+- Next: T1.5 — `auto_restore` and `spell_check`. Today an invalid word commits the
+  letter transformation with every tone key literal; a Vietnamese buffer is already
+  correct, so T1.5 is about `test` → `tét` becoming `test` again.
+- Not implemented, by design: auto-restore and spell-check (T1.5), case matrix (T1.6),
+  VNI (T1.7), Simple Telex's restricted rule set (T1.8). Those methods currently pass
+  letters through unchanged.
 - C ABI names follow the AGENTS.md naming rules (no abbreviations): `code_point`,
   `commit_length`, `preedit_length`, `reserved_flags`, `configuration`, `engine`.
 - Product name: **`directtype`**; the public repository is

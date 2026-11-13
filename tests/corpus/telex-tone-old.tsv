@@ -1,0 +1,31 @@
+# Telex tone keys with the old tone style. Only `oa`, `oe` and `uy` open syllables
+# differ (spec §3.4 rule 4): the mark sits on the second vowel, `hoà` rather than
+# `hòa`. Everything else in this file is a counter-example that must not move.
+hoas	hoá
+hoaf	hoà
+hoar	hoả
+hoax	hoã
+hoaj	hoạ
+hoes	hoé
+hoef	hoè
+hoer	hoẻ
+thuys	thuý
+thuyf	thuỳ
+thuyr	thuỷ
+thuyj	thuỵ
+#
+# Closed syllables keep the last nucleus vowel under both styles.
+hoangf	hoàng
+hoangs	hoáng
+toans	toán
+khoans	khoán
+#
+# Counter-examples: these open pairs keep their first vowel under both styles.
+cais	cái
+cuar	của
+muas	múa
+caos	cáo
+#
+# `qu` and `gi` onsets are unaffected by the style.
+quys	quý
+gias	giá

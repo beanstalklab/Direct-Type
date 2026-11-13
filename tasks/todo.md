@@ -184,8 +184,8 @@ cargo test --workspace
 **Scope:** M
 
 ### Checkpoint B
-- [ ] `viet-cli type --method telex "vieejt"` prints `việt`
-- [ ] Parser and tone-index tests green, including `qu`/`gi`
+- [x] `viet-cli type --method telex "vieejt"` prints `việt`
+- [x] Parser and tone-index tests green, including `qu`/`gi`
 - [ ] Human review before tone application
 
 ---
@@ -195,11 +195,33 @@ cargo test --workspace
 **Description:** Apply `s/f/r/x/j` to the position from T1.3; `z` removes a tone; doubling a tone key removes it and keeps the letter (`ass → as`). `free_tone_mark` allows a tone key typed at any position to reposition.
 
 **Acceptance criteria:**
-- [ ] Five tone keys produce the correct precomposed character
-- [ ] Tone on the right vowel for all T1.3 cases
-- [ ] `z` removes a tone, `ass → as`, `asz → as`
-- [ ] `free_tone_mark` on: `vieejt` and `viejte`-style orderings both yield `việt`
-- [ ] `telex-tone.tsv` ≥ 100 cases passing
+- [x] Five tone keys produce the correct precomposed character
+- [x] Tone on the right vowel for all T1.3 cases
+- [x] `z` removes a tone, `ass → as`, `asz → as`
+- [x] `free_tone_mark` on: `vieejt` and `vieetj` both yield `việt` (the task text said
+      `viejte`-style, which cannot reach `việt`; the working pair is the mark before
+      the coda and the mark after the last letter)
+- [x] `telex-tone.tsv` ≥ 100 cases passing (152 cases, plus 22 in `telex-tone-old.tsv`)
+
+**Decisions recorded in this task:**
+
+- A tone key is a letter until the word can take a tone (`sz → sz`), and a word that
+  never becomes one syllable keeps every tone key literal (`ashello → ashello`), so
+  no keystroke is lost before `auto_restore` exists.
+- The mark is placed from the *finished* syllable, not from the text at the moment the
+  key was typed. That is what makes `toasn → toán` work with `free_tone_mark` on and
+  what makes the mark follow a syllable that grows (`toa` → `toan`).
+- Removing a tone (doubling or `z`) puts the tone key's letter back at the position
+  where it was typed, so `asdz → asd`, not `asd`-reordered or `ads`. `z` with no tone
+  is the letter `z` (`az → az`).
+- `free_tone_mark` off means "the mark must follow the last letter of the word":
+  `vieetj → việt`, `vieejt → viêjt`. It is a timing rule, not a placement rule, so
+  `tone.rs` is unchanged by it.
+- A later tone key replaces the tone (`asf → à`); it never stacks `á` + `à`.
+- VNI and SimpleTelex still pass their keys through unchanged; their tone logic waits
+  for T1.7/T1.8, and `tone.rs` gained no method-specific branch.
+- Corpus source: hand-written cases derived from spec §3.2/§3.4, same policy as T1.2 —
+  no imported word list, no third-party oracle.
 
 **Verification:**
 ```bash
@@ -208,7 +230,7 @@ cargo run -p viet-cli -- check tests/corpus
 ```
 
 **Dependencies:** T1.3
-**Files:** `crates/viet-core/src/telex.rs`, `crates/viet-core/src/tone.rs`, `tests/corpus/telex-tone.tsv`
+**Files:** `crates/viet-core/src/telex.rs`, `crates/viet-core/src/tone.rs`, `crates/viet-core/src/syllable.rs`, `crates/viet-core/src/unicode.rs`, `crates/viet-core/src/lib.rs`, `tests/corpus/telex-tone.tsv`, `tests/corpus/telex-tone-old.tsv`
 **Scope:** M
 
 ---

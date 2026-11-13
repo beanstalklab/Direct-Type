@@ -12,7 +12,7 @@ Working name: `unikey` (placeholder — must be renamed before release, the name
 | `docs/SPIKE-ime-feasibility.md` | ready to run (needs GUI + sudo) | Phase 0 investigation: exact commands, app matrix, go/no-go on key injection |
 | `docs/SPEC-engine-core.md` | approved; Q2 corpus size open | Full spec for the first implementation module |
 | `tasks/plan.md` | approved | Implementation order, risks, decisions for `engine-core` |
-| `tasks/todo.md` | T1.1–T1.3 done; T1.4 next | Task-by-task acceptance criteria and verification commands |
+| `tasks/todo.md` | T1.1–T1.4 done; T1.5 next | Task-by-task acceptance criteria and verification commands |
 
 Per `AGENTS.md`, no implementation code is written before `CAPABILITIES.md` and the module spec are approved; both are, and `tasks/plan.md` drives the work. When a plan decision changes, this file changes in the same commit.
 

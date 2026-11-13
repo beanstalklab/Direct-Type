@@ -11,11 +11,6 @@
 //! Splitting the glide out would give `hoa` one nucleus vowel and `khuỷu` two, and
 //! both tone placements would then be wrong.
 
-// Tone placement is wired into the engine in T1.4. Until then the parser has no
-// caller outside its own tests, and an unused item is a warning this project treats
-// as an error. Remove this attribute in T1.4 rather than widening it.
-#![allow(dead_code)]
-
 use crate::unicode::base_letter;
 
 /// A Vietnamese syllable is at most seven letters (`nghiêng`, `khuyểnh`). The
@@ -149,7 +144,9 @@ mod tests {
         assert_eq!(lengths("cai"), Some((1, 2, 0)));
         assert_eq!(lengths("cua"), Some((1, 2, 0)));
         assert_eq!(lengths("hoa"), Some((1, 2, 0)));
-        assert_eq!(lengths("thuỷ"), None, "toned input has no table entry yet");
+        // Tones do not change the structure: the tone table landed in T1.4, so a
+        // toned vowel is a vowel like any other.
+        assert_eq!(lengths("thuỷ"), Some((2, 2, 0)));
         assert_eq!(lengths("uy"), Some((0, 2, 0)));
     }
 
@@ -170,7 +167,7 @@ mod tests {
         assert_eq!(lengths("giao"), Some((2, 2, 0)));
         // Without a following vowel, `i` is the nucleus, not part of an onset.
         assert_eq!(lengths("gi"), Some((1, 1, 0)));
-        assert_eq!(lengths("gì"), None, "toned input has no table entry yet");
+        assert_eq!(lengths("gì"), Some((1, 1, 0)));
     }
 
     #[test]

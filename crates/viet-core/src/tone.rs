@@ -1,12 +1,7 @@
 //! Tone placement (spec §3.4).
 //!
-//! Answers "which vowel takes the mark?" and nothing else; applying the mark needs
-//! the tone table, which arrives with the tone keys in T1.4.
-
-// Tone placement is wired into the engine in T1.4. Until then nothing outside the
-// tests calls it, and an unused item is a warning this project treats as an error.
-// Remove this attribute in T1.4 rather than widening it.
-#![allow(dead_code)]
+//! Answers "which vowel takes the mark?" and nothing else; the Telex fold in
+//! `telex.rs` applies the mark it names.
 
 use crate::syllable::Syllable;
 use crate::unicode::{base_letter, letter_mark};

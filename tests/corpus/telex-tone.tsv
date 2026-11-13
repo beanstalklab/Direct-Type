@@ -1,0 +1,183 @@
+# Telex tone keys, spec §3.2 and §3.4. New tone style (the file name carries no
+# style suffix), so `oa`, `oe` and `uy` mark their first vowel: `hóa`, not `hoá`.
+#
+# Every tone key on every vowel spelling the table can hold: twelve vowels times
+# five tones. A reading of the table, not a word list, so it is the same source as
+# `unicode.rs`; the expected values are Vietnamese orthography.
+#
+# s = sắc (acute), f = huyền (grave), r = hỏi (hook above), x = ngã (tilde),
+# j = nặng (under dot).
+as	á
+af	à
+ar	ả
+ax	ã
+aj	ạ
+aws	ắ
+awf	ằ
+awr	ẳ
+awx	ẵ
+awj	ặ
+aas	ấ
+aaf	ầ
+aar	ẩ
+aax	ẫ
+aaj	ậ
+es	é
+ef	è
+er	ẻ
+ex	ẽ
+ej	ẹ
+ees	ế
+eef	ề
+eer	ể
+eex	ễ
+eej	ệ
+is	í
+if	ì
+ir	ỉ
+ix	ĩ
+ij	ị
+os	ó
+of	ò
+or	ỏ
+ox	õ
+oj	ọ
+oos	ố
+oof	ồ
+oor	ổ
+oox	ỗ
+ooj	ộ
+ows	ớ
+owf	ờ
+owr	ở
+owx	ỡ
+owj	ợ
+us	ú
+uf	ù
+ur	ủ
+ux	ũ
+uj	ụ
+uws	ứ
+uwf	ừ
+uwr	ử
+uwx	ữ
+uwj	ự
+ys	ý
+yf	ỳ
+yr	ỷ
+yx	ỹ
+yj	ỵ
+#
+# §3.4 rule 1: a quality diacritic takes the tone wherever it sits in the syllable.
+vieejt	việt
+vieetj	việt
+tieengs	tiếng
+truowngf	trường
+truowngs	trướng
+dduowngf	đường
+nguwowif	người
+nhuwngx	những
+chuwar	chửa
+chuwax	chữa
+mowis	mới
+cuoocs	cuốc
+cuoocj	cuộc
+ddoongf	đồng
+ddoongs	đống
+ddoongj	động
+ddieeuf	điều
+ddieeus	điếu
+ddieeuj	điệu
+uows	ướ
+uowf	ườ
+uowj	ượ
+#
+# §3.4 rule 2: a closed syllable marks its last nucleus vowel, whatever the style.
+toans	toán
+toanf	toàn
+khoans	khoán
+hoangf	hoàng
+hoangs	hoáng
+hoanf	hoàn
+banj	bạn
+cacs	các
+ddangs	đáng
+lais	lái
+caos	cáo
+keos	kéo
+meos	méo
+#
+# §3.4 rule 3: an open syllable marks the first of two vowels, the middle of three.
+cais	cái
+cuar	của
+muas	múa
+tuis	túi
+tois	tói
+khuyur	khuỷu
+#
+# `oa`, `oe` and `uy` move under the new style only; every other open pair does not.
+hoas	hóa
+hoaf	hòa
+hoar	hỏa
+hoax	hõa
+hoaj	họa
+hoes	hóe
+hoef	hòe
+thuys	thúy
+thuyf	thùy
+thuyr	thủy
+thuyj	thụy
+#
+# `qu` and `gi` are onsets, so the tone lands on the vowel after them.
+quas	quá
+quaf	quà
+quaj	quạ
+quys	quý
+quyeenf	quyền
+quyeens	quyến
+quyeets	quyết
+gias	giá
+giaos	giáo
+gif	gì
+giuwx	giữ
+giuwax	giữa
+#
+# A later tone key replaces the tone instead of adding a second one.
+asf	à
+asfr	ả
+asfrx	ã
+asfrxj	ạ
+#
+# Doubling a tone key undoes it and keeps the letter; `z` removes the tone and puts
+# the tone key's letter back where it was typed.
+ass	as
+aass	âs
+toanss	toans
+asz	as
+asdz	asd
+toansz	toans
+az	az
+#
+# A tone key typed before the coda is accepted and the mark moves when the coda
+# arrives: this is `free_tone_mark`, which is on by default.
+toasn	toán
+hoasn	hoán
+vieejn	viện
+#
+# Case follows the vowel that carries the mark.
+AS	Á
+As	Á
+aS	á
+AWS	Ắ
+Toans	Toán
+TOANS	TOÁN
+Thuys	Thúy
+THUYR	THỦY
+DDAS	ĐÁ
+DDANGS	ĐÁNG
+Vieejt	Việt
+VIEEJT	VIỆT
+#
+# Words end at whitespace, so a tone cannot leak into the next word.
+toans hoas	toán hóa
+tieengs Vieejt	tiếng Việt

@@ -40,7 +40,7 @@ Each task ends with something you can type into and observe via `viet-cli`.
 
 **Checkpoint B:** `viet type --method telex "vieejt"` prints `việt`; parser unit tests cover `qu`, `gi`, 1/2/3-vowel nuclei, coda/no-coda.
 
-- [ ] **T1.4 Telex tone keys, tone removal, free tone mark**
+- [x] **T1.4 Telex tone keys, tone removal, free tone mark**
 - [ ] **T1.5 Auto-restore and spell-check**
 - [ ] **T1.6 Case handling (lower/UPPER/Title/mixed)**
 
@@ -80,12 +80,14 @@ Each task ends with something you can type into and observe via `viet-cli`.
 ## Open Questions
 
 - **Q1 (blocks T0.3):** confirm zero runtime crates + static table, vs `unicode-normalization`.
-- **Q2 (answered for T1.2):** corpus source. T1.2 used hand-written cases derived
-  from spec §3.2 — no imported word list, no third-party oracle. Still open: how the
-  corpus grows past `fixtures/anchor` cases to Checkpoint C's 2,000. Options: import
-  a public Vietnamese word list (needs a licence check) or compare against
-  `fcitx5-bamboo` as an oracle (best coverage, needs its own harness).
-- **Q3 (blocks T1.4):** default `tone_style`: `New` (`hòa/thủy`) proposed.
+- **Q2 (answered for T1.2 and T1.4):** corpus source. Both tasks used hand-written
+  cases derived from spec §3.2/§3.4 — no imported word list, no third-party oracle;
+  152 tone cases and 22 old-style tone cases now pass. Still open: how the corpus
+  grows past hand-written cases to Checkpoint C's 2,000. Options: import a public
+  Vietnamese word list (needs a licence check) or compare against `fcitx5-bamboo` as
+  an oracle (best coverage, needs its own harness).
+- **Q3 (answered):** default `tone_style`: `New` (`hòa/thủy`). Implemented as
+  `ToneStyle::default()` in T1.3 and exercised by `telex-tone.tsv` in T1.4.
 - **Q4 (blocks first commit):** project name + licence. `unikey` is a trademark; rename before the repo is published.
 - **Q5:** `free_tone_mark` in v1 — proposed yes.
 
