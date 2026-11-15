@@ -1077,6 +1077,71 @@ plus the human check, per application.
 `addon/src/engine.h`, `addon/src/engine.cpp`, `addon/tests/typing_check.cpp`
 **Scope:** M
 
+## T4.9 — The strategy is decided per context
+
+**Description:** `Auto` resolves the strategy from the input context instead of the user
+picking one globally. Reading fcitx5's Wayland frontend showed why: it advertises
+`SurroundingText` and then drops a deletion it cannot map, and it forwards only the client
+preedit.
+
+**Acceptance criteria:**
+- [x] `Auto` is the default and rewrites in place only when the application sends valid
+      surrounding text
+- [x] `Preedit`, `Backspace` and `SurroundingText` remain as explicit overrides
+- [x] `ClientPreedit=False` is documented as a Wayland trap, not recommended
+
+**Dependencies:** T4.8
+**Files:** `addon/src/config.h`, `addon/src/engine.h`, `addon/src/engine.cpp`,
+`docs/PLAN.md`
+**Scope:** S
+
+## T4.10 — The strategy is latched for the whole word
+
+**Description:** A review of T4.9 found that `publish` asked `Auto` on **every keystroke**.
+An application whose surrounding text becomes valid (or stops being valid) mid-word would
+then change mechanism halfway: the preedit path would show the whole word on top of the part
+the application already has, and the direct path would delete characters the application
+never received. Both are silent text corruption, so the decision moves into its own policy
+object, latched at the first keystroke of a word.
+
+**Acceptance criteria:**
+- [x] `RewriteChoice` (pure policy, no fcitx5 input context) decides once per word; an
+      explicit setting always applies immediately and is never cached against an application
+- [x] `endWord` is called at a boundary, a toggle, a lost focus and a settings change, so the
+      next word decides again
+- [x] `rewrite_check` fails if the latch is removed (mutation: re-decide every keystroke
+      fails two cases)
+- [x] A settings change drops the typing buffer with the engine's copy of the word, instead
+      of appending later keystrokes to text derived under the old rules
+- [x] A boundary with no word in progress no longer publishes an empty preedit
+- [x] `install.sh` restarts fcitx5 (`fcitx5 -d --replace`) instead of only reloading config,
+      because a new addon library is not in the addon list until the daemon starts again
+
+**Decisions recorded in this task:**
+
+- The latch lives in `RewriteChoice`, not in `DirectTypeEngine`, so the policy is checked
+  without a session. It takes the facts it needs (`configured`, `surroundingTextUsable`) and
+  owns no fcitx5 object beyond the configuration enum.
+- Latched, not remembered per application: fcitx5 exposes no stable application identity to
+  an addon, and the per-word answer is the one that has to be stable for text to be correct.
+  A per-application profile is still the right shape for a default, once Checkpoint G names
+  the applications.
+- `ClientPreedit` stays in the settings for the applications that draw the client preedit
+  badly, even though it must not be used on Wayland; the label says where the word is drawn,
+  not what the protocol does.
+
+**Verification:**
+```bash
+ctest --test-dir addon/build --output-on-failure   # 5 cases, rewrite_check included
+bash scripts/build_deb.sh
+```
+
+**Dependencies:** T4.9
+**Files:** `addon/src/rewrite.h`, `addon/src/rewrite.cpp`, `addon/src/engine.h`,
+`addon/src/engine.cpp`, `addon/src/typing.h`, `addon/src/typing.cpp`,
+`addon/tests/rewrite_check.cpp`, `addon/CMakeLists.txt`, `install.sh`
+**Scope:** M
+
 ### Checkpoint G — installable
 - [ ] `./install.sh` on a clean machine, then `vieejt` types `việt` in a real app
 - [ ] GNOME Wayland, KDE Wayland and X11 each verified by a human

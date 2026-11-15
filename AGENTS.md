@@ -254,7 +254,16 @@ commands, and do not lower a check to get to green.
   text; forwarded keys exist via a virtual keyboard but are not ordered with the commit; and
   the protocol only carries the *client* preedit, so `ClientPreedit=False` shows nothing on
   Wayland. `Auto` therefore rewrites in place only where surrounding text is valid, and keeps a
-  preedit elsewhere. Package 0.0.4.
+  preedit elsewhere.
+- **T4.10 done (review of T4.9)**: `Auto` was being re-asked on every keystroke, so an
+  application whose surrounding text changed mid-word would switch mechanism halfway and
+  duplicate or delete text. `addon/src/rewrite.h` (`RewriteChoice`) now latches the answer at
+  the first keystroke of a word, releases it at a boundary, a toggle, a lost focus or a
+  settings change, and takes the facts as arguments so the policy is checked without a session
+  (`rewrite_check`, mutation-checked). A settings change now drops the typing buffer with the
+  engine's copy of the word. `install.sh` restarts fcitx5 (`fcitx5 -d --replace`) instead of
+  only reloading config, because a newly installed addon library is not in the addon list
+  until the daemon starts. Five addon ctest cases. Package 0.0.5.
 - Checkpoint G remains the only thing left in Phase 4: install on a machine with fcitx5 and
   type `vieejt` in a real application — and now, specifically, in Sublime Text and a
   terminal, where the previous build failed.

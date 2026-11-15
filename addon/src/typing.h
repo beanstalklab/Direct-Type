@@ -62,8 +62,9 @@ public:
     /// a new word instead of continuing the one that was just committed.
     void setVietnameseEnabled(bool enabled);
 
-    /// Apply a new engine configuration. The word in progress has to be finished by the
-    /// caller first: the engine drops it, because it was derived with the previous rules.
+    /// Apply a new engine configuration. The word in progress is dropped, in the engine and
+    /// here, because it was derived with the previous rules; the caller has to finish it
+    /// first if the text matters.
     void setEngineConfiguration(const viet_config_t &configuration);
 
     /// Drop everything, including the word.

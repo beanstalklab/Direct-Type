@@ -114,6 +114,9 @@ void TypingSession::setEngineConfiguration(const viet_config_t &configuration) {
     if (engine_ != nullptr) {
         viet_engine_set_config(engine_, &configuration);
     }
+    // The engine dropped the word it had. Keeping ours would append the rest of the word to
+    // text derived under the previous rules, so the buffer goes with it.
+    word_.clear();
 }
 
 void TypingSession::reset() {

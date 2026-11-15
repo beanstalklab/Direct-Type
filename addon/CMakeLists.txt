@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 # The addon version is the product version; the engine's crate version follows it.
-project(directtype-addon VERSION 0.0.4 LANGUAGES CXX)
+project(directtype-addon VERSION 0.0.5 LANGUAGES CXX)
 
 # fcitx5's package files default to `${CMAKE_INSTALL_PREFIX}/lib/fcitx5`, which on a Debian
 # install is `/usr/local/lib/fcitx5` - a directory fcitx5 never looks in. Ask for the
@@ -39,6 +39,7 @@ add_library(directtype MODULE
     src/config.cpp
     src/engine.cpp
     src/keys.cpp
+    src/rewrite.cpp
     src/status.cpp
     src/typing.cpp
 )
@@ -107,7 +108,7 @@ add_test(NAME typing_check COMMAND typing_check)
 
 # The settings survive a restart, and they live where a restart looks for them.
 add_executable(config_check tests/config_check.cpp
-    src/config.cpp src/engine.cpp src/keys.cpp src/status.cpp src/typing.cpp)
+    src/config.cpp src/engine.cpp src/keys.cpp src/rewrite.cpp src/status.cpp src/typing.cpp)
 target_include_directories(config_check PRIVATE
     src
     "${CMAKE_CURRENT_SOURCE_DIR}/../crates/viet-ffi/include"
@@ -116,3 +117,14 @@ target_link_libraries(config_check PRIVATE Fcitx5::Core "${ENGINE_ARCHIVE}" pthr
 target_compile_options(config_check PRIVATE -Wall -Wextra -Wpedantic -Werror)
 add_dependencies(config_check engine)
 add_test(NAME config_check COMMAND config_check)
+
+# How the word reaches the application is decided once per word. A strategy that changes
+# mid-word corrupts the text in both directions, and no session is needed to check the latch.
+add_executable(rewrite_check tests/rewrite_check.cpp src/rewrite.cpp)
+target_include_directories(rewrite_check PRIVATE
+    src
+    "${CMAKE_CURRENT_SOURCE_DIR}/../crates/viet-ffi/include"
+)
+target_link_libraries(rewrite_check PRIVATE Fcitx5::Core)
+target_compile_options(rewrite_check PRIVATE -Wall -Wextra -Wpedantic -Werror)
+add_test(NAME rewrite_check COMMAND rewrite_check)

@@ -69,6 +69,17 @@ private:
     bool clientPreedit_;
 };
 
+/// Whether the application lets an input method rewrite text it has already received. Both
+/// halves matter: the capability says the application implements the protocol, and valid
+/// surrounding text says it has actually told us what is there. fcitx5's Wayland frontend
+/// silently drops a deletion it cannot map to surrounding text, so a false positive here is
+/// visible only as broken text.
+bool surroundingTextUsable(fcitx::InputContext *inputContext) {
+    return inputContext != nullptr &&
+           inputContext->capabilityFlags().test(fcitx::CapabilityFlag::SurroundingText) &&
+           inputContext->surroundingText().isValid();
+}
+
 } // namespace
 
 DirectTypeEngine::DirectTypeEngine()
@@ -90,35 +101,28 @@ std::vector<fcitx::InputMethodEntry> DirectTypeEngine::listInputMethods() {
     return entries;
 }
 
-fcitx::DirectTypeRewrite
-DirectTypeEngine::effectiveRewrite(fcitx::InputContext *inputContext) const {
-    const fcitx::DirectTypeRewrite configured = config_.rewrite.value();
-    if (configured != fcitx::DirectTypeRewrite::Auto) {
-        return configured;
-    }
-    // Rewriting in place needs the application to send surrounding text: fcitx5's Wayland
-    // frontend silently drops a deletion it cannot map, and the application never notices.
-    if (inputContext != nullptr &&
-        inputContext->capabilityFlags().test(fcitx::CapabilityFlag::SurroundingText) &&
-        inputContext->surroundingText().isValid()) {
-        return fcitx::DirectTypeRewrite::SurroundingText;
-    }
-    return fcitx::DirectTypeRewrite::Preedit;
+fcitx::DirectTypeRewrite DirectTypeEngine::rewriteFor(fcitx::InputContext *inputContext) {
+    return rewrite_.decide(config_.rewrite.value(), surroundingTextUsable(inputContext));
 }
 
 void DirectTypeEngine::publish(const directtype::TypingResult &result,
                                fcitx::InputContext *inputContext) {
-    if (effectiveRewrite(inputContext) != fcitx::DirectTypeRewrite::Preedit) {
+    if (rewriteFor(inputContext) != fcitx::DirectTypeRewrite::Preedit) {
         applyDirectly(result, inputContext);
-        return;
+    } else {
+        InputContextTarget target(inputContext, config_.clientPreedit.value());
+        if (result.ended) {
+            target.showPreedit("");
+            target.commit(result.text);
+        } else {
+            target.showPreedit(result.text);
+        }
     }
 
-    InputContextTarget target(inputContext, config_.clientPreedit.value());
     if (result.ended) {
-        target.showPreedit("");
-        target.commit(result.text);
-    } else {
-        target.showPreedit(result.text);
+        // The next word asks again: by then the application may have lost (or gained) the
+        // ability to be rewritten.
+        rewrite_.endWord();
     }
 }
 
@@ -133,9 +137,8 @@ void DirectTypeEngine::applyDirectly(const directtype::TypingResult &result,
         // atomic request that some applications accept and ignore, and forwarded backspace
         // keys work in any field that accepts keys. That is why the strategy is a setting.
         const bool surroundingText =
-            effectiveRewrite(inputContext) == fcitx::DirectTypeRewrite::SurroundingText &&
-            inputContext->capabilityFlags().test(fcitx::CapabilityFlag::SurroundingText) &&
-            inputContext->surroundingText().isValid();
+            rewriteFor(inputContext) == fcitx::DirectTypeRewrite::SurroundingText &&
+            surroundingTextUsable(inputContext);
         if (surroundingText) {
             inputContext->deleteSurroundingText(-static_cast<int>(result.backspaces),
                                                 result.backspaces);
@@ -152,20 +155,20 @@ void DirectTypeEngine::applyDirectly(const directtype::TypingResult &result,
 }
 
 void DirectTypeEngine::commitWord(fcitx::InputContext *inputContext) {
-    if (effectiveRewrite(inputContext) != fcitx::DirectTypeRewrite::Preedit) {
-        // The application already has the text: there is no preedit to clear.
-        if (session_.hasWord()) {
-            // End the word the way a boundary would, so `auto_restore` still gets its say.
-            applyDirectly(session_.type(directtype::KeyAction::Boundary, 0), inputContext);
-        }
-        return;
-    }
     if (!session_.hasWord()) {
         return;
     }
-    InputContextTarget target(inputContext, config_.clientPreedit.value());
-    target.showPreedit("");
-    target.commit(session_.takeWord());
+
+    if (rewriteFor(inputContext) != fcitx::DirectTypeRewrite::Preedit) {
+        // The application already has the text: there is no preedit to clear. End the word
+        // the way a boundary would, so `auto_restore` still gets its say.
+        applyDirectly(session_.type(directtype::KeyAction::Boundary, 0), inputContext);
+    } else {
+        InputContextTarget target(inputContext, config_.clientPreedit.value());
+        target.showPreedit("");
+        target.commit(session_.takeWord());
+    }
+    rewrite_.endWord();
 }
 
 void DirectTypeEngine::keyEvent(const fcitx::InputMethodEntry &entry,
@@ -211,7 +214,11 @@ void DirectTypeEngine::keyEvent(const fcitx::InputMethodEntry &entry,
     if (action == directtype::KeyAction::Boundary) {
         // The word ends here: `auto_restore` may rewrite it, and then it is committed. The
         // boundary key itself is not consumed, so the space still reaches the application.
-        publish(session_.type(action, 0), inputContext);
+        // With no word there is nothing to end, and no preedit to clear.
+        const directtype::TypingResult result = session_.type(action, 0);
+        if (result.ended) {
+            publish(result, inputContext);
+        }
         return;
     }
 
@@ -231,6 +238,7 @@ void DirectTypeEngine::reset(const fcitx::InputMethodEntry &entry,
     // the user typed. Whether a commit after focus loss is honoured is the frontend's choice.
     commitWord(event.inputContext());
     session_.reset();
+    rewrite_.endWord();
 }
 
 std::string DirectTypeEngine::subModeLabelImpl(const fcitx::InputMethodEntry &entry,
@@ -259,4 +267,7 @@ void DirectTypeEngine::reloadConfig() {
 void DirectTypeEngine::applyConfiguration() {
     session_.setEngineConfiguration(directtype::toEngineConfiguration(config_));
     session_.setVietnameseEnabled(config_.vietnameseEnabled.value());
+    // The settings may change mid-word (fcitx5-configtool), and the engine has dropped the
+    // word they were derived under; the next keystroke starts a new one.
+    rewrite_.endWord();
 }

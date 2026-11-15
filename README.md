@@ -5,13 +5,13 @@ Vietnamese orthography and nothing else.
 
 The engine is **direct**: it answers a keystroke with "delete these characters, insert
 these", so a frontend *can* type without a composition buffer and without the underline
-that composition-based input methods draw. The fcitx5 addon that ships today keeps the
-word in a preedit until the word boundary, because Linux applications cannot be relied on
-to let an input method rewrite text they have already received: Sublime Text and some
-terminals accept the commit and drop the deletion, which turns `việt` into
-`vĐiệỗt`-shaped garbage. UniKey and Bamboo keep a preedit for the same reason. Direct
-commit, where the application proves it can be rewritten, is the direction of travel —
-not the v1 behaviour.
+that composition-based input methods draw. The fcitx5 addon that ships today uses that path
+wherever the application allows it — Chromium, most GTK/Qt toolkits — and keeps the word in
+a preedit only where rewriting is impossible, because Linux applications cannot be relied on
+to let an input method rewrite text they have already received: Sublime Text accepts the
+commit and drops the deletion, and draws no preedit either. UniKey and Bamboo keep a preedit
+everywhere for the same reason. The strategy is decided once per word, never mid-word, since
+changing it halfway would duplicate or delete text.
 
 The first language is Vietnamese. English needs no transformation, so it works as the
 identity path. The engine is a rule pack, not a Vietnamese-specific program.
@@ -33,7 +33,7 @@ Pre-alpha. What exists today:
   exit codes `0`/`1`/`2`).
 - `crates/viet-ffi` — a C ABI over the engine, with panics contained at the boundary;
   `crates/viet-ffi/tests/smoke.c` is a C caller linked against both library artifacts.
-- 630 corpus cases and CI that runs formatting, lint, tests and the corpus.
+- 638 corpus cases and CI that runs formatting, lint, tests and the corpus.
 
 The fcitx5 addon types through the engine, has its language toggle and its settings: one
 input method named "Direct Type", the word shown in a preedit and committed at the word
@@ -43,11 +43,12 @@ boundary, Alt+Z to switch between Vietnamese and English, and method, tone place
 `~/.config/fcitx5/conf/directtype.conf`. fcitx5's status area shows the active language next
 to the input method name.
 
-How the word reaches the application is resolved per input context: when the application
-sends surrounding text, the addon commits each keystroke and rewrites it in place (no
-underline, text as you type); when it does not, the word is kept in a preedit and committed at
-the boundary. `Rewrite` can force either one, or the forwarded-backspace variant, for the
-applications that need a specific answer.
+How the word reaches the application is decided per word: when the application sends
+surrounding text, the addon commits each keystroke and rewrites it in place (no underline,
+text as you type); when it does not, the word is kept in a preedit and committed at the
+boundary. The decision is latched for the whole word, because changing mechanism halfway
+would duplicate or delete text. `Rewrite` can force one answer, including the
+forwarded-backspace variant, for the applications where the automatic choice is wrong.
 
 ## Install
 
@@ -119,9 +120,10 @@ immediately and rewrite what is already on screen when a modifier changes it.
 
 On Linux that last step is the hard part. `deleteSurroundingText` is optional for
 applications and several of them accept the commit while ignoring the deletion, so the
-v1 addon keeps the word in a preedit, exactly like the other Vietnamese IMEs for fcitx5.
-The engine is built so the direct path can be used wherever an application supports it —
-see `docs/PLAN.md` for the strategy table and the open question.
+addon asks the application whether it can be rewritten and uses the direct path only when
+the answer is trustworthy; otherwise it keeps the word in a preedit, like the other
+Vietnamese input methods for fcitx5. See `docs/PLAN.md` for the strategy table and the open
+per-application question.
 
 ## Licence
 

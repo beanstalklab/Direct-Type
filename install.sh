@@ -74,8 +74,11 @@ install_package() {
 }
 
 restart_fcitx5() {
-    if command -v fcitx5-remote >/dev/null 2>&1; then
-        fcitx5-remote -r >/dev/null 2>&1 || true
+    # A newly installed addon library is not in fcitx5's addon list until the daemon starts
+    # again; `fcitx5-remote -r` only re-reads configuration, which is why the first install
+    # still needed a logout. Restart the running daemon, and leave a stopped one alone.
+    if command -v fcitx5-remote >/dev/null 2>&1 && fcitx5-remote --check >/dev/null 2>&1; then
+        fcitx5 -d --replace >/dev/null 2>&1 || true
     fi
 }
 
@@ -122,11 +125,11 @@ case "${1:-}" in
 --help | -h | --uninstall) ;;
 *)
     echo
-    echo "Installed. Last step, once:"
+    echo "Installed. fcitx5 was restarted, so 'Direct Type' can be added now:"
     echo "  1. open fcitx5 configuration (fcitx5-configtool)"
     echo "  2. add 'Direct Type' to the input method list and press Apply"
     echo
     echo "Then type: Alt+Z switches Vietnamese/English. 'vieejt' becomes 'việt'."
-    echo "If it does not appear, log out and back in so fcitx5 loads the new addon."
+    echo "If 'Direct Type' is not in the list, log out and back in once."
     ;;
 esac

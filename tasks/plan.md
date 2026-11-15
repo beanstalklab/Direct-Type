@@ -82,9 +82,12 @@ direct typing through the C ABI (T4.2), then the language toggle (T4.3), configu
 - [x] **T4.6 One-command install**
 - [x] **T4.7 The word lives in a preedit** (from the first real install: deletion is not
       portable, so v1 uses the preedit path for every application)
-- [x] **T4.8 Three ways to reach the application**: `Preedit`, `Backspace`,
-      `SurroundingText`, selectable, because each fails silently in a different client (from the first real install: deletion is not
-      portable, so v1 uses the preedit path for every application)
+- [x] **T4.8 Three ways to reach the application**: `Preedit`, `Backspace` and
+      `SurroundingText`, selectable, because each fails silently in a different client
+- [x] **T4.9 The strategy is decided per input context**: `Auto` is the default after reading
+      fcitx5's Wayland frontend; the delete API is dropped silently without surrounding text
+- [x] **T4.10 The strategy is latched for the whole word**: a mid-word change would duplicate
+      or delete text, so the decision belongs to the word, not the keystroke
 
 **Checkpoint G:** `./install.sh` on a clean machine, then `vieejt` types `việt` in a real
 application, on GNOME Wayland, KDE Wayland and X11.

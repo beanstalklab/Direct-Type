@@ -37,17 +37,32 @@ Two different IME architectures are being conflated:
 | Mechanism | engine builds a *preedit* string; app renders it | hook swallows key, emits final char |
 | Underline | drawn by the app for preedit (by design) | none — nothing is in composition |
 | Apps without preedit rendering (Sublime, some Electron) | text invisible until commit | works normally |
-
-**Decision 2026-11-13 (supersedes the "no composition underscore" goal for v1):** the v1
-addon uses the **preedit** strategy for every application. The direct path needs
-`deleteSurroundingText`, and Sublime Text and some terminals accept the commit while
-dropping the deletion, which produces visible garbage (`Đỗ` → `DĐoôỗ`). UniKey and Bamboo
-hold a preedit for the same reason. The engine stays direct-capable — it answers with
-delete-and-insert, which a frontend that can rewrite text uses directly — so the preedit is
-a frontend choice, revisitable per application once the survival matrix from the spike
-exists. Consequence: the name `Direct-Type` now describes the engine, not what the addon
-does today; the product name decision (D5) should be revisited before publishing.
 | Word finalization | needs an explicit commit (space/punctuation) | none |
+
+**Decision 2026-11-15 (supersedes the "no composition underscore" goal for v1):** the addon
+resolves the strategy **once per word** (`Rewrite=Auto`, T4.9, hardened in T4.10). When the
+application sends valid surrounding text, each keystroke is committed and the text so far is
+rewritten in place — the original goal: no underline, no space to finish. When it does not,
+the word is held in a preedit until the boundary. The engine stays direct-capable: it answers
+with delete-and-insert, which a frontend that can rewrite text uses directly, so the preedit
+is a frontend choice, not an engine limit.
+
+Consequences, recorded rather than hidden:
+
+- Goal 1 (§1) is met only where the application's surrounding text is usable: Chromium, most
+  GTK/Qt toolkits, and terminals that implement the protocol. Elsewhere the preedit, and its
+  underline, is the only mechanism that shows anything: Sublime Text drops
+  `deleteSurroundingText` **and** draws no preedit, so no input method can type there
+  as-you-go (UniKey included).
+- The strategy must not change inside a word. A flip mid-word duplicates the word (a preedit
+  on top of the text the application already has) or deletes text outside it (direct deletes
+  against text the application never received), so `RewriteChoice` latches the answer at the
+  first keystroke of a word and releases it when the word ends.
+- `ClientPreedit=False` is a trap on Wayland: fcitx5's frontend forwards only the *client*
+  preedit, so the panel preedit is never delivered and the application shows nothing.
+- The name `Direct-Type` still describes the engine rather than every session; the product
+  name decision (D5) stays open until Checkpoint G reports which applications are direct.
+
 
 `Super+Space` is a third mechanism: GNOME's XKB *layout* switcher (`us` ↔ `vn`), unrelated to IME mode. Using it as an IME toggle cannot work while GNOME owns the binding. The installer must take ownership of the shortcut explicitly.
 
@@ -87,11 +102,12 @@ Romanization and rule-based languages (e.g. Korean jamo composition) fit this in
  { consumed, backspaces, commit_text, preedit_text }
       |
  [ C++ strategy layer ]  chooses how the action reaches the app
+      |- Auto            : rewrite in place when surrounding text is valid, else preedit
       |- Preedit          : standard; underlined; universal fallback
       |- SurroundingText  : delete N chars + commit; no underline; needs app support
       '- ForwardKey       : synthetic key events; true UniKey behavior; target-dependent
       |
- per-application profile: auto default + manual override in tray menu
+ per-word strategy: the answer is latched at the first keystroke of a word
 ```
 
 Key property: the core is a pure function of (config, buffered word, key event) → action. That makes it testable without fcitx5, and reusable later by an IBus engine, a uinput daemon, or a CLI.
@@ -122,7 +138,12 @@ Rules: no globals, no allocation in the hot path beyond a small reuseable buffer
 | SurroundingText | no | GTK3/4, Qt6, parts of Chromium/Electron | needs `surrounding-text` + `delete-surrounding-text`; undo/redo pollution |
 | ForwardKey | no | depends on target; good on X11 and KDE | GNOME Wayland feasibility unproven — spike item |
 
-Default policy: try SurroundingText, fall back to Preedit, per-app override; ForwardKey only where verified.
+Default policy: `Auto` — rewrite in place when the input context sends valid surrounding
+text, keep a preedit otherwise, and decide once per word; `Preedit`, `SurroundingText` and
+`Backspace` (forwarded keys) are explicit overrides for an application where `Auto` guesses
+wrong. A per-application override is the natural next step once the matrix from the spike
+exists; `ForwardKey` stays the last resort because fcitx5's Wayland frontend sends those keys
+through a virtual keyboard that is not ordered with the commit.
 
 ## 5. Repository layout
 
