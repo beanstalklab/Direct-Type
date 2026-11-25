@@ -157,6 +157,29 @@ int main() {
               "the language can be turned back on");
     }
 
+    // A file written by an older build must not pin the old answer permanently. Those builds
+    // defaulted `Rewrite` to `Preedit` and wrote it on every save, and they also offered a
+    // `ClientPreedit` switch that leaves the word invisible on GNOME. The key was renamed, so
+    // a stale value is ignored and the new default applies — the settings that still exist
+    // keep working.
+    {
+        // The file goes into the same config directory: fcitx5 caches the XDG paths on first
+        // use, so changing the variable now would not be noticed and the test would pass
+        // without reading anything.
+        {
+            std::FILE *file = std::fopen(expected.c_str(), "w");
+            std::fputs("Rewrite=Preedit\nClientPreedit=False\nMethod=Vni\n", file);
+            std::fclose(file);
+        }
+
+        DirectTypeEngine upgraded;
+        const directtype::DirectTypeConfig &settings = configurationOf(upgraded);
+        check(settings.delivery.value() == fcitx::DirectTypeRewrite::Auto,
+              "a Rewrite= line from an older build does not override the new default");
+        check(settings.method.value() == fcitx::DirectTypeMethod::Vni,
+              "the settings that still exist are still read");
+    }
+
     std::filesystem::remove_all(temporary);
 
     if (failures != 0) {

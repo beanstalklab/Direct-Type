@@ -21,12 +21,17 @@ FCITX_CONFIG_ENUM(DirectTypeToneStyle, Old, New);
 ///
 /// There is no single answer on Linux: a preedit is drawn by the application (and some lie
 /// about being able to), the surrounding-text API is optional (and silently ignored when the
-/// application does not send surrounding text), and forwarded backspace keys travel a
-/// different protocol than the commit, with no ordering guarantee.
+/// application does not send surrounding text), and forwarded backspace keys are ordered with
+/// the commit only on some frontends.
 ///
-/// `Auto` resolves it per input context: rewrite in place when the application sends
-/// surrounding text, otherwise keep a preedit. The others force one answer, for when `Auto`
-/// guesses wrong.
+/// `Auto` resolves it per input context and per word: rewrite in place where the application
+/// sends surrounding text, rewrite with forwarded keys on the X11 frontend where they are
+/// ordered with the commit, and keep a preedit everywhere else. The others force one answer,
+/// for when `Auto` guesses wrong.
+///
+/// The key is `Delivery` rather than the older `Rewrite` because those earlier builds wrote
+/// `Rewrite=Preedit` into the config by default; keeping the name would have made that stale
+/// value override the new `Auto` default forever.
 FCITX_CONFIG_ENUM(DirectTypeRewrite, Auto, Preedit, Backspace, SurroundingText);
 
 } // namespace fcitx
@@ -47,8 +52,8 @@ FCITX_CONFIGURATION(
                                                   fcitx::DirectTypeMethod::Telex};
     fcitx::Option<fcitx::DirectTypeToneStyle> toneStyle{
         this, "ToneStyle", _("Tone placement"), fcitx::DirectTypeToneStyle::New};
-    fcitx::Option<fcitx::DirectTypeRewrite> rewrite{
-        this, "Rewrite", _("How the word reaches the application"),
+    fcitx::Option<fcitx::DirectTypeRewrite> delivery{
+        this, "Delivery", _("How the word reaches the application"),
         fcitx::DirectTypeRewrite::Auto};
     fcitx::Option<bool> autoRestore{this, "AutoRestore",
                                     _("Restore a word that is not Vietnamese"), true};
@@ -57,9 +62,6 @@ FCITX_CONFIGURATION(
                                    false};
     fcitx::Option<bool> freeToneMark{this, "FreeToneMark",
                                      _("Accept the tone key anywhere in a syllable"), true};
-    fcitx::Option<bool> clientPreedit{
-        this, "ClientPreedit",
-        _("Draw the word in the text field instead of a separate preedit window"), true};
     fcitx::Option<bool> vietnameseEnabled{this, "VietnameseEnabled", _("Vietnamese"), true};
     fcitx::Option<fcitx::Key> toggleKey{this, "ToggleKey",
                                         _("Toggle Vietnamese/English"),

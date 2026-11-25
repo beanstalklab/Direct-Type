@@ -3,7 +3,7 @@
 namespace directtype {
 
 fcitx::DirectTypeRewrite RewriteChoice::decide(fcitx::DirectTypeRewrite configured,
-                                              bool surroundingTextUsable) {
+                                              DeliveryFacts facts) {
     if (configured != fcitx::DirectTypeRewrite::Auto) {
         // A strategy the user picked is not a guess about the application, so it applies
         // immediately rather than waiting for the next word.
@@ -13,11 +13,16 @@ fcitx::DirectTypeRewrite RewriteChoice::decide(fcitx::DirectTypeRewrite configur
     }
 
     if (!decided_) {
-        // The one guess in the addon: an application that sends surrounding text can be
-        // rewritten in place, one that does not cannot (fcitx5's Wayland frontend drops the
-        // deletion silently, so the mistake is only visible as broken text).
-        current_ = surroundingTextUsable ? fcitx::DirectTypeRewrite::SurroundingText
-                                         : fcitx::DirectTypeRewrite::Preedit;
+        // The one guess in the addon, in falling order of quality: rewriting committed text
+        // is invisible when the application cooperates, forwarding keys is invisible when the
+        // frontend keeps them in order, and a preedit always shows the word — underlined.
+        if (facts.surroundingTextUsable) {
+            current_ = fcitx::DirectTypeRewrite::SurroundingText;
+        } else if (facts.forwardedKeysOrdered) {
+            current_ = fcitx::DirectTypeRewrite::Backspace;
+        } else {
+            current_ = fcitx::DirectTypeRewrite::Preedit;
+        }
         decided_ = true;
     }
     return current_;

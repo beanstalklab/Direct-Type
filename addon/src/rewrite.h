@@ -5,6 +5,18 @@
 
 namespace directtype {
 
+/// What the addon can learn about the application in front of it.
+struct DeliveryFacts {
+    /// The application sends the text around the cursor, so a deletion can be mapped onto it.
+    /// Both halves matter, and the frontend only reports the first.
+    bool surroundingTextUsable = false;
+    /// The frontend delivers forwarded keys in order with the committed text. fcitx5's X11
+    /// (XIM) path does: the key goes through the same X connection as everything else. Its
+    /// Wayland path does not: a forwarded key goes through a virtual keyboard, a different
+    /// protocol from the input-method commit, so the two can arrive in either order.
+    bool forwardedKeysOrdered = false;
+};
+
 /// Chooses how the word in progress reaches the application, once per word.
 ///
 /// The choice has to survive the keystrokes of the word it was made for. Asking again on
@@ -20,12 +32,15 @@ class RewriteChoice {
 public:
     /// The strategy for the word being typed. An explicit setting always wins and is never
     /// cached against the application, so changing it takes effect at the next keystroke;
-    /// `Auto` is resolved from `surroundingTextUsable` the first time it is asked in a word.
+    /// `Auto` is resolved from `facts` the first time it is asked in a word.
     fcitx::DirectTypeRewrite decide(fcitx::DirectTypeRewrite configured,
-                                    bool surroundingTextUsable);
+                                    DeliveryFacts facts);
 
     /// The word ended: the next one decides again.
     void endWord();
+
+    /// Whether this word's strategy has been chosen yet, for a caller that wants to report it.
+    bool decided() const { return decided_; }
 
 private:
     fcitx::DirectTypeRewrite current_ = fcitx::DirectTypeRewrite::Preedit;

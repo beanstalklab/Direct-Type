@@ -271,6 +271,18 @@ commands, and do not lower a check to get to green.
   engine's copy of the word. `install.sh` restarts fcitx5 (`fcitx5 -d --replace`) instead of
   only reloading config, because a newly installed addon library is not in the addon list
   until the daemon starts. Five addon ctest cases. Package 0.0.5.
+- **T4.11 done (from a real install of 0.0.6)**: Chrome and the terminal still showed the
+  underlined preedit, and Sublime showed nothing until the space. Two causes. First, builds
+  up to 0.0.6 wrote `Rewrite=Preedit` into the config by default, so the `Auto` default could
+  never take effect for anyone who had used those builds; the key is now `Delivery`, and a
+  stale `Rewrite=` line is simply ignored (`config_check` pins that). Second, `Auto` had only
+  one useful answer; it now falls back to forwarded-backspace rewriting on the XIM frontend,
+  where fcitx5 sends the key on the same X connection as the commit, and only there. `ClientPreedit`
+  is removed: fcitx5's panel preedit on Wayland is a `zwp_input_panel_v1` surface that Mutter
+  does not implement (`waylandui.cpp` includes only that protocol), so turning the client
+  preedit off hid the word entirely. `DIRECTTYPE_DEBUG=1 fcitx5 --replace` prints one line per
+  word with the program, frontend, surrounding-text usability and chosen delivery. Package
+  0.0.7.
 - Checkpoint G remains the only thing left in Phase 4: install on a machine with fcitx5 and
   type `vieejt` in a real application — and now, specifically, in Sublime Text and a
   terminal, where the previous build failed.

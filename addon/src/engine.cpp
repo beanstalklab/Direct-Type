@@ -1,7 +1,10 @@
 #include "engine.h"
 
+#include <cstdlib>
 #include <string>
 #include <utility>
+
+#include <fcitx-utils/log.h>
 
 #include <fcitx-config/iniparser.h>
 #include <fcitx-utils/capabilityflags.h>
@@ -24,14 +27,17 @@ constexpr const char *configurationPath = "conf/directtype.conf";
 
 /// Shows the word in progress to the application.
 ///
-/// The preedit is where the word lives until a boundary. When the application supports a
-/// client-side preedit it is drawn in the text field itself (underlined, at the cursor);
-/// otherwise fcitx5 draws its own preedit window. Either way the application does not receive
-/// the text until the word is finished, which is what makes a modifier reliable.
+/// The preedit is where the word lives until a boundary: the application draws it in the text
+/// field itself, underlined, at its own cursor, and receives no text until the word is
+/// finished.
+///
+/// The panel preedit is deliberately not used. fcitx5's own preedit window on Wayland is an
+/// `zwp_input_panel_v1` surface, which GNOME does not implement, so that window never appears
+/// there and turning the client preedit off would leave the word invisible.
 class InputContextTarget final : public directtype::TextTarget {
 public:
-    InputContextTarget(fcitx::InputContext *inputContext, bool clientPreedit)
-        : inputContext_(inputContext), clientPreedit_(clientPreedit) {}
+    explicit InputContextTarget(fcitx::InputContext *inputContext)
+        : inputContext_(inputContext) {}
 
     void showPreedit(const std::string &text) override {
         if (inputContext_ == nullptr) {
@@ -42,18 +48,7 @@ public:
         } else {
             fcitx::Text preedit(text);
             preedit.setCursor(static_cast<int>(text.size()));
-            // Client-side preedit is drawn by the application, at its own cursor. Some
-            // applications misplace it while typing fast (Chrome among them), so it is an
-            // option: turning it off moves the preedit into fcitx5's own window, which is
-            // positioned from the cursor rectangle the frontend reports.
-            const bool clientPreedit =
-                clientPreedit_ &&
-                inputContext_->capabilityFlags().test(fcitx::CapabilityFlag::Preedit);
-            if (clientPreedit) {
-                inputContext_->inputPanel().setClientPreedit(preedit);
-            } else {
-                inputContext_->inputPanel().setPreedit(preedit);
-            }
+            inputContext_->inputPanel().setClientPreedit(preedit);
         }
         inputContext_->updatePreedit();
     }
@@ -66,7 +61,6 @@ public:
 
 private:
     fcitx::InputContext *inputContext_;
-    bool clientPreedit_;
 };
 
 /// Whether the application lets an input method rewrite text it has already received. Both
@@ -78,6 +72,39 @@ bool surroundingTextUsable(fcitx::InputContext *inputContext) {
     return inputContext != nullptr &&
            inputContext->capabilityFlags().test(fcitx::CapabilityFlag::SurroundingText) &&
            inputContext->surroundingText().isValid();
+}
+
+/// Whether this frontend delivers a forwarded key in order with the committed text.
+///
+/// The X11 (XIM) frontend sends the key event on the same X connection as the commit, so a
+/// backspace always lands before the text that follows it. The Wayland frontend sends
+/// forwarded keys through a virtual keyboard and commits through the input-method protocol:
+/// two different paths, with no ordering guarantee, which is how `DĐoôỗ` happens.
+bool forwardedKeysOrdered(fcitx::InputContext *inputContext) {
+    return inputContext != nullptr && inputContext->frontendName() == "xim";
+}
+
+/// The name of a strategy, for a log line.
+const char *deliveryName(fcitx::DirectTypeRewrite delivery) {
+    switch (delivery) {
+    case fcitx::DirectTypeRewrite::Auto:
+        return "Auto";
+    case fcitx::DirectTypeRewrite::Preedit:
+        return "Preedit";
+    case fcitx::DirectTypeRewrite::Backspace:
+        return "Backspace";
+    case fcitx::DirectTypeRewrite::SurroundingText:
+        return "SurroundingText";
+    }
+    return "unknown";
+}
+
+/// Whether to print what `Auto` decided. A user diagnosing an application runs fcitx5 with
+/// `DIRECTTYPE_DEBUG=1` and reads the lines; nothing is printed otherwise, because one line
+/// per word would fill the journal during normal typing.
+bool debugEnabled() {
+    const char *value = std::getenv("DIRECTTYPE_DEBUG");
+    return value != nullptr && value[0] != '\0';
 }
 
 } // namespace
@@ -102,7 +129,27 @@ std::vector<fcitx::InputMethodEntry> DirectTypeEngine::listInputMethods() {
 }
 
 fcitx::DirectTypeRewrite DirectTypeEngine::rewriteFor(fcitx::InputContext *inputContext) {
-    return rewrite_.decide(config_.rewrite.value(), surroundingTextUsable(inputContext));
+    directtype::DeliveryFacts facts;
+    facts.surroundingTextUsable = surroundingTextUsable(inputContext);
+    facts.forwardedKeysOrdered = forwardedKeysOrdered(inputContext);
+
+    const bool firstDecision = !rewrite_.decided();
+    const fcitx::DirectTypeRewrite delivery = rewrite_.decide(config_.delivery.value(), facts);
+
+    // Only the decision that starts a word is reported: it is the one that depends on the
+    // application, and repeating it per keystroke would bury the useful lines.
+    if (firstDecision && debugEnabled()) {
+        FCITX_INFO() << "directtype: program="
+                     << (inputContext != nullptr ? inputContext->program() : std::string())
+                     << " frontend="
+                     << (inputContext != nullptr
+                             ? std::string(inputContext->frontendName())
+                             : std::string())
+                     << " surroundingText=" << facts.surroundingTextUsable
+                     << " orderedForwardKeys=" << facts.forwardedKeysOrdered
+                     << " delivery=" << deliveryName(delivery);
+    }
+    return delivery;
 }
 
 void DirectTypeEngine::publish(const directtype::TypingResult &result,
@@ -110,7 +157,7 @@ void DirectTypeEngine::publish(const directtype::TypingResult &result,
     if (rewriteFor(inputContext) != fcitx::DirectTypeRewrite::Preedit) {
         applyDirectly(result, inputContext);
     } else {
-        InputContextTarget target(inputContext, config_.clientPreedit.value());
+        InputContextTarget target(inputContext);
         if (result.ended) {
             target.showPreedit("");
             target.commit(result.text);
@@ -164,7 +211,7 @@ void DirectTypeEngine::commitWord(fcitx::InputContext *inputContext) {
         // the way a boundary would, so `auto_restore` still gets its say.
         applyDirectly(session_.type(directtype::KeyAction::Boundary, 0), inputContext);
     } else {
-        InputContextTarget target(inputContext, config_.clientPreedit.value());
+        InputContextTarget target(inputContext);
         target.showPreedit("");
         target.commit(session_.takeWord());
     }

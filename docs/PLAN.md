@@ -40,12 +40,14 @@ Two different IME architectures are being conflated:
 | Word finalization | needs an explicit commit (space/punctuation) | none |
 
 **Decision 2026-11-15 (supersedes the "no composition underscore" goal for v1):** the addon
-resolves the strategy **once per word** (`Rewrite=Auto`, T4.9, hardened in T4.10). When the
-application sends valid surrounding text, each keystroke is committed and the text so far is
-rewritten in place — the original goal: no underline, no space to finish. When it does not,
-the word is held in a preedit until the boundary. The engine stays direct-capable: it answers
-with delete-and-insert, which a frontend that can rewrite text uses directly, so the preedit
-is a frontend choice, not an engine limit.
+resolves the strategy **once per word** (`Delivery=Auto`, T4.9, hardened in T4.10 and
+T4.11). When the application sends valid surrounding text, each keystroke is committed and
+the text so far is rewritten in place — the original goal: no underline, no space to finish.
+On the X11 (XIM) frontend, whose forwarded keys travel the same connection as the commit, it
+rewrites with forwarded backspace keys instead. Everywhere else the word is held in a
+preedit until the boundary, underlined, which is what every Linux IME does. The engine stays
+direct-capable: it answers with delete-and-insert, which a frontend that can rewrite text
+uses directly, so the preedit is a frontend choice, not an engine limit.
 
 Consequences, recorded rather than hidden:
 
@@ -58,8 +60,14 @@ Consequences, recorded rather than hidden:
   on top of the text the application already has) or deletes text outside it (direct deletes
   against text the application never received), so `RewriteChoice` latches the answer at the
   first keystroke of a word and releases it when the word ends.
-- `ClientPreedit=False` is a trap on Wayland: fcitx5's frontend forwards only the *client*
-  preedit, so the panel preedit is never delivered and the application shows nothing.
+- `ClientPreedit` is gone. fcitx5's own preedit window on Wayland is an
+  `zwp_input_panel_v1` surface, which GNOME does not implement (`waylandui.cpp` includes only
+  that protocol), so the panel preedit is never shown there: turning the client preedit off
+  left the word invisible. The addon always requests the client preedit.
+- The configuration key is `Delivery`, not `Rewrite`. Builds up to 0.0.6 wrote
+  `Rewrite=Preedit` into the file by default, so keeping the name would have let that stale
+  value override the new `Auto` default forever; a renamed key is ignored, a changed default
+  is not.
 - The name `Direct-Type` still describes the engine rather than every session; the product
   name decision (D5) stays open until Checkpoint G reports which applications are direct.
 

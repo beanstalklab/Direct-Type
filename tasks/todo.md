@@ -1180,6 +1180,53 @@ bash scripts/build_deb.sh
 `addon/tests/rewrite_check.cpp`, `addon/CMakeLists.txt`, `install.sh`
 **Scope:** M
 
+## T4.11 — `Auto` uses the mechanism each frontend can actually honour
+
+**Description:** After 0.0.6 a real session still showed the underlined preedit in Chrome and
+the terminal, and nothing at all while typing in Sublime. Two separate causes: the settings
+file still carried `Rewrite=Preedit` (those builds wrote that value by default, so the new
+`Auto` default never applied), and `Auto` had only one useful answer — surrounding text or
+preedit — while the X11 frontend can rewrite with forwarded keys safely.
+
+**Acceptance criteria:**
+- [x] The config key is `Delivery`; a `Rewrite=` line written by 0.0.3–0.0.6 is ignored, so
+      the new default applies without asking the user to edit a file
+- [x] `Auto` falls back to `Backspace` on the XIM frontend, where forwarded keys travel the
+      same X connection as the commit, and only there
+- [x] `ClientPreedit` is removed: on GNOME the panel preedit is an `zwp_input_panel_v1`
+      surface, which Mutter does not implement, so turning the client preedit off hid the
+      word entirely
+- [x] `DIRECTTYPE_DEBUG=1 fcitx5 --replace` prints one line per word: program, frontend,
+      surrounding-text usability, forwarded-key ordering, chosen delivery
+- [x] `config_check` proves a stale `Rewrite=Preedit` file does not override the default;
+      `rewrite_check` covers the three-way fallback
+
+**Decisions recorded in this task:**
+
+- Renaming the key is the migration. A version marker in the file would need an option the
+  settings UI would show, and it would still have to guess whether a stored `Preedit` was a
+  default or a choice; a new key is ignored by old files and honest about the change.
+- `Auto`'s order is quality order: rewriting committed text (invisible, one request) beats
+  forwarding keys (invisible, a burst of events, safe only when ordered with the commit),
+  which beats a preedit (visible underline). A preedit is the floor, not the default.
+- The X11 fallback is keyed on the frontend name rather than on the absence of surrounding
+  text, because "no surrounding text" is equally true on Wayland, where forwarded keys are
+  *not* ordered with the commit — the exact `DĐoôỗ` failure.
+- `ClientPreedit` is not replaced by "detect Wayland": the option existed for applications
+  that draw the client preedit badly, and on GNOME its other setting is broken, so the only
+  useful state is on.
+
+**Verification:**
+```bash
+ctest --test-dir addon/build --output-on-failure
+DIRECTTYPE_DEBUG=1 fcitx5 --replace   # then type in each application
+```
+
+**Dependencies:** T4.10
+**Files:** `addon/src/config.h`, `addon/src/rewrite.h`, `addon/src/rewrite.cpp`,
+`addon/src/engine.cpp`, `addon/tests/rewrite_check.cpp`, `addon/tests/config_check.cpp`
+**Scope:** M
+
 ### Checkpoint G — installable
 - [ ] `./install.sh` on a clean machine, then `vieejt` types `việt` in a real app
 - [ ] GNOME Wayland, KDE Wayland and X11 each verified by a human

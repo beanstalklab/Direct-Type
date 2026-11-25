@@ -90,6 +90,8 @@ direct typing through the C ABI (T4.2), then the language toggle (T4.3), configu
       fcitx5's Wayland frontend; the delete API is dropped silently without surrounding text
 - [x] **T4.10 The strategy is latched for the whole word**: a mid-word change would duplicate
       or delete text, so the decision belongs to the word, not the keystroke
+- [x] **T4.11 `Auto` uses what each frontend can honour**: `Delivery` replaces the stale
+      `Rewrite` key, XIM rewrites with forwarded keys, and `ClientPreedit` is gone
 
 **Checkpoint G:** `./install.sh` on a clean machine, then `vieejt` types `việt` in a real
 application, on GNOME Wayland, KDE Wayland and X11.

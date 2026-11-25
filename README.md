@@ -43,12 +43,18 @@ boundary, Alt+Z to switch between Vietnamese and English, and method, tone place
 `~/.config/fcitx5/conf/directtype.conf`. fcitx5's status area shows the active language next
 to the input method name.
 
-How the word reaches the application is decided per word: when the application sends
-surrounding text, the addon commits each keystroke and rewrites it in place (no underline,
-text as you type); when it does not, the word is kept in a preedit and committed at the
-boundary. The decision is latched for the whole word, because changing mechanism halfway
-would duplicate or delete text. `Rewrite` can force one answer, including the
-forwarded-backspace variant, for the applications where the automatic choice is wrong.
+How the word reaches the application is decided per word, in falling order of quality:
+where the application sends surrounding text the addon commits each keystroke and rewrites
+it in place (no underline, text as you type); on the X11 frontend, whose forwarded keys are
+ordered with the commit, it rewrites with backspace keys instead; everywhere else it keeps
+the word in a preedit and commits at the boundary, which is where the underline comes from.
+The decision is latched for the whole word, because changing mechanism halfway would
+duplicate or delete text. `Delivery` can force one answer for an application where the
+automatic choice is wrong.
+
+To see what `Auto` picks, and what the application offered, run fcitx5 in a terminal with
+`DIRECTTYPE_DEBUG=1 fcitx5 --replace`; one line per word reports the program, the frontend,
+whether surrounding text was usable, and the strategy.
 
 ## Install
 
