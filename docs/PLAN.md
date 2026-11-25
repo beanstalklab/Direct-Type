@@ -66,8 +66,10 @@ Consequences, recorded rather than hidden:
   left the word invisible. The addon always requests the client preedit.
 - The configuration key is `Delivery`, not `Rewrite`. Builds up to 0.0.6 wrote
   `Rewrite=Preedit` into the file by default, so keeping the name would have let that stale
-  value override the new `Auto` default forever; a renamed key is ignored, a changed default
-  is not.
+  value override any new default forever; a renamed key is ignored, a changed default is not.
+- Goal 1 (§1) is not reachable through fcitx5 in applications that drop the deletion: the
+  only mechanism that cannot be ignored is a key event at the kernel level, which is the
+  design in `docs/DESIGN-input-daemon.md`, not something an addon can do.
 - The name `Direct-Type` still describes the engine rather than every session; the product
   name decision (D5) stays open until Checkpoint G reports which applications are direct.
 

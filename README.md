@@ -43,18 +43,19 @@ boundary, Alt+Z to switch between Vietnamese and English, and method, tone place
 `~/.config/fcitx5/conf/directtype.conf`. fcitx5's status area shows the active language next
 to the input method name.
 
-How the word reaches the application is decided per word, in falling order of quality:
-where the application sends surrounding text the addon commits each keystroke and rewrites
-it in place (no underline, text as you type); on the X11 frontend, whose forwarded keys are
-ordered with the commit, it rewrites with backspace keys instead; everywhere else it keeps
-the word in a preedit and commits at the boundary, which is where the underline comes from.
-The decision is latched for the whole word, because changing mechanism halfway would
-duplicate or delete text. `Delivery` can force one answer for an application where the
-automatic choice is wrong.
+The word reaches the application through a **preedit** by default: it is drawn in the text
+field, underlined, and committed at the word boundary. That is the floor Linux offers,
+because the alternative — commit every keystroke and delete what changed — depends on the
+application honouring `deleteSurroundingText`, and several do not: Sublime Text and Chrome's
+address bar accept the commit and drop the deletion, which turns `Đỗ` into `DĐoôỗ`. Nothing
+in the protocol lets an input method tell those fields from the ones that work, and Chrome
+disagrees with itself (its page content honours the deletion, its address bar does not), so
+the rewriting modes are a deliberate choice rather than a guess.
 
-To see what `Auto` picks, and what the application offered, run fcitx5 in a terminal with
-`DIRECTTYPE_DEBUG=1 fcitx5 --replace`; one line per word reports the program, the frontend,
-whether surrounding text was usable, and the strategy.
+`Delivery=SurroundingText` (or `Backspace`) switches an application you have seen honour the
+deletion to per-keystroke rewriting, without the underline. To see what a field offers, run
+`DIRECTTYPE_DEBUG=1 fcitx5 --replace` in a terminal: one line per word reports the program,
+the frontend, whether surrounding text was usable, and the delivery in use.
 
 ## Install
 

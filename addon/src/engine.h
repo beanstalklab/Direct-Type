@@ -7,7 +7,6 @@
 
 #include "config.h"
 #include "keys.h"
-#include "rewrite.h"
 #include "typing.h"
 
 /// The addon's engine: one input method, two languages, one Vietnamese state machine.
@@ -16,11 +15,10 @@
 /// about fcitx5; this class is the adapter around it: classify the key, apply the toggle
 /// key, render the word as a preedit, commit it at the boundary, and persist the settings.
 ///
-/// The word reaches the application by whichever mechanism that application supports, decided
-/// once per word (`RewriteChoice`, `Rewrite=Auto`): rewritten in place where surrounding text
-/// is available, kept in a preedit where it is not, because Linux applications cannot be
-/// relied on to let an input method rewrite text they already received — Sublime Text and some
-/// terminals accept the commit and drop the deletion.
+/// The word reaches the application by the mechanism in `Delivery`: a preedit by default,
+/// because Linux applications cannot be relied on to let an input method rewrite text they
+/// already received — Sublime Text, Chrome's address bar and some terminals accept the commit
+/// and drop the deletion, which turns `Đỗ` into `DĐoôỗ`.
 ///
 /// `InputMethodEngineV2` rather than `InputMethodEngine` because the sub-mode label — the
 /// "Vietnamese"/"English" text in fcitx5's status area — only exists on V2:
@@ -66,9 +64,6 @@ private:
     void applyDirectly(const directtype::TypingResult &result,
                        fcitx::InputContext *inputContext);
 
-    /// The strategy for the word in progress. `Auto` is resolved from the input context the
-    /// first time it is asked in a word, and kept until the word ends.
-    fcitx::DirectTypeRewrite rewriteFor(fcitx::InputContext *inputContext);
 
     /// Finish the word in the preedit by committing it. Used when the word has to end for a
     /// reason the engine does not see: a toggle, a configuration change, a lost focus.
@@ -79,7 +74,6 @@ private:
 
     directtype::DirectTypeConfig config_;
     directtype::TypingSession session_;
-    directtype::RewriteChoice rewrite_;
 };
 
 #endif // DIRECTTYPE_ENGINE_H

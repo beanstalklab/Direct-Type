@@ -87,8 +87,6 @@ bool forwardedKeysOrdered(fcitx::InputContext *inputContext) {
 /// The name of a strategy, for a log line.
 const char *deliveryName(fcitx::DirectTypeRewrite delivery) {
     switch (delivery) {
-    case fcitx::DirectTypeRewrite::Auto:
-        return "Auto";
     case fcitx::DirectTypeRewrite::Preedit:
         return "Preedit";
     case fcitx::DirectTypeRewrite::Backspace:
@@ -99,9 +97,9 @@ const char *deliveryName(fcitx::DirectTypeRewrite delivery) {
     return "unknown";
 }
 
-/// Whether to print what `Auto` decided. A user diagnosing an application runs fcitx5 with
-/// `DIRECTTYPE_DEBUG=1` and reads the lines; nothing is printed otherwise, because one line
-/// per word would fill the journal during normal typing.
+/// Whether to print what this input context offers. A user diagnosing an application runs
+/// fcitx5 with `DIRECTTYPE_DEBUG=1` and reads the lines; nothing is printed otherwise, because
+/// one line per word would fill the journal during normal typing.
 bool debugEnabled() {
     const char *value = std::getenv("DIRECTTYPE_DEBUG");
     return value != nullptr && value[0] != '\0';
@@ -128,33 +126,9 @@ std::vector<fcitx::InputMethodEntry> DirectTypeEngine::listInputMethods() {
     return entries;
 }
 
-fcitx::DirectTypeRewrite DirectTypeEngine::rewriteFor(fcitx::InputContext *inputContext) {
-    directtype::DeliveryFacts facts;
-    facts.surroundingTextUsable = surroundingTextUsable(inputContext);
-    facts.forwardedKeysOrdered = forwardedKeysOrdered(inputContext);
-
-    const bool firstDecision = !rewrite_.decided();
-    const fcitx::DirectTypeRewrite delivery = rewrite_.decide(config_.delivery.value(), facts);
-
-    // Only the decision that starts a word is reported: it is the one that depends on the
-    // application, and repeating it per keystroke would bury the useful lines.
-    if (firstDecision && debugEnabled()) {
-        FCITX_INFO() << "directtype: program="
-                     << (inputContext != nullptr ? inputContext->program() : std::string())
-                     << " frontend="
-                     << (inputContext != nullptr
-                             ? std::string(inputContext->frontendName())
-                             : std::string())
-                     << " surroundingText=" << facts.surroundingTextUsable
-                     << " orderedForwardKeys=" << facts.forwardedKeysOrdered
-                     << " delivery=" << deliveryName(delivery);
-    }
-    return delivery;
-}
-
 void DirectTypeEngine::publish(const directtype::TypingResult &result,
                                fcitx::InputContext *inputContext) {
-    if (rewriteFor(inputContext) != fcitx::DirectTypeRewrite::Preedit) {
+    if (config_.delivery.value() != fcitx::DirectTypeRewrite::Preedit) {
         applyDirectly(result, inputContext);
     } else {
         InputContextTarget target(inputContext);
@@ -164,12 +138,6 @@ void DirectTypeEngine::publish(const directtype::TypingResult &result,
         } else {
             target.showPreedit(result.text);
         }
-    }
-
-    if (result.ended) {
-        // The next word asks again: by then the application may have lost (or gained) the
-        // ability to be rewritten.
-        rewrite_.endWord();
     }
 }
 
@@ -184,7 +152,7 @@ void DirectTypeEngine::applyDirectly(const directtype::TypingResult &result,
         // atomic request that some applications accept and ignore, and forwarded backspace
         // keys work in any field that accepts keys. That is why the strategy is a setting.
         const bool surroundingText =
-            rewriteFor(inputContext) == fcitx::DirectTypeRewrite::SurroundingText &&
+            config_.delivery.value() == fcitx::DirectTypeRewrite::SurroundingText &&
             surroundingTextUsable(inputContext);
         if (surroundingText) {
             inputContext->deleteSurroundingText(-static_cast<int>(result.backspaces),
@@ -206,7 +174,7 @@ void DirectTypeEngine::commitWord(fcitx::InputContext *inputContext) {
         return;
     }
 
-    if (rewriteFor(inputContext) != fcitx::DirectTypeRewrite::Preedit) {
+    if (config_.delivery.value() != fcitx::DirectTypeRewrite::Preedit) {
         // The application already has the text: there is no preedit to clear. End the word
         // the way a boundary would, so `auto_restore` still gets its say.
         applyDirectly(session_.type(directtype::KeyAction::Boundary, 0), inputContext);
@@ -215,7 +183,6 @@ void DirectTypeEngine::commitWord(fcitx::InputContext *inputContext) {
         target.showPreedit("");
         target.commit(session_.takeWord());
     }
-    rewrite_.endWord();
 }
 
 void DirectTypeEngine::keyEvent(const fcitx::InputMethodEntry &entry,
@@ -270,11 +237,26 @@ void DirectTypeEngine::keyEvent(const fcitx::InputMethodEntry &entry,
     }
 
     const uint32_t codepoint = fcitx::Key::keySymToUnicode(key.sym());
+    const bool startsWord = !session_.hasWord();
     const directtype::TypingResult result = session_.type(action, codepoint);
     if (result.consumed) {
         // The key was typed into the preedit, so the application must not also receive it.
         publish(result, inputContext);
         keyEvent.filterAndAccept();
+    }
+    if (startsWord && debugEnabled()) {
+        // One line per word, on request: what the application says it can do, next to what
+        // the user chose. That is the pair that explains a report like "garbage in the
+        // address bar but fine in the page".
+        FCITX_INFO() << "directtype: program="
+                     << (inputContext != nullptr ? inputContext->program() : std::string())
+                     << " frontend="
+                     << (inputContext != nullptr
+                             ? std::string(inputContext->frontendName())
+                             : std::string())
+                     << " surroundingText=" << surroundingTextUsable(inputContext)
+                     << " orderedForwardKeys=" << forwardedKeysOrdered(inputContext)
+                     << " delivery=" << deliveryName(config_.delivery.value());
     }
 }
 
@@ -285,7 +267,6 @@ void DirectTypeEngine::reset(const fcitx::InputMethodEntry &entry,
     // the user typed. Whether a commit after focus loss is honoured is the frontend's choice.
     commitWord(event.inputContext());
     session_.reset();
-    rewrite_.endWord();
 }
 
 std::string DirectTypeEngine::subModeLabelImpl(const fcitx::InputMethodEntry &entry,
@@ -314,7 +295,4 @@ void DirectTypeEngine::reloadConfig() {
 void DirectTypeEngine::applyConfiguration() {
     session_.setEngineConfiguration(directtype::toEngineConfiguration(config_));
     session_.setVietnameseEnabled(config_.vietnameseEnabled.value());
-    // The settings may change mid-word (fcitx5-configtool), and the engine has dropped the
-    // word they were derived under; the next keystroke starts a new one.
-    rewrite_.endWord();
 }

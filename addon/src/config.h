@@ -19,20 +19,18 @@ FCITX_CONFIG_ENUM(DirectTypeToneStyle, Old, New);
 
 /// How the word reaches the application while it is being typed.
 ///
-/// There is no single answer on Linux: a preedit is drawn by the application (and some lie
-/// about being able to), the surrounding-text API is optional (and silently ignored when the
-/// application does not send surrounding text), and forwarded backspace keys are ordered with
-/// the commit only on some frontends.
+/// `Preedit` is the default because it is the only mechanism an application cannot silently
+/// break. `SurroundingText` and `Backspace` commit every keystroke and then delete the part
+/// that changed; an application that accepts the commit and ignores the deletion shows
+/// `DĐoôỗ` for `Đỗ`, and nothing in the protocol lets the input method tell that application
+/// apart from one that honours it. Chrome's own fields disagree with each other: the page
+/// honours the deletion, the address bar drops it. So the rewriting modes are an explicit
+/// choice for an application known to honour them, never a guess.
 ///
-/// `Auto` resolves it per input context and per word: rewrite in place where the application
-/// sends surrounding text, rewrite with forwarded keys on the X11 frontend where they are
-/// ordered with the commit, and keep a preedit everywhere else. The others force one answer,
-/// for when `Auto` guesses wrong.
-///
-/// The key is `Delivery` rather than the older `Rewrite` because those earlier builds wrote
-/// `Rewrite=Preedit` into the config by default; keeping the name would have made that stale
-/// value override the new `Auto` default forever.
-FCITX_CONFIG_ENUM(DirectTypeRewrite, Auto, Preedit, Backspace, SurroundingText);
+/// The key is `Delivery` rather than the older `Rewrite` because builds up to 0.0.7 wrote
+/// `Rewrite=Preedit` into the config by default; keeping the name would have let that stale
+/// value stand in for a decision the user never made.
+FCITX_CONFIG_ENUM(DirectTypeRewrite, Preedit, Backspace, SurroundingText);
 
 } // namespace fcitx
 
@@ -54,7 +52,7 @@ FCITX_CONFIGURATION(
         this, "ToneStyle", _("Tone placement"), fcitx::DirectTypeToneStyle::New};
     fcitx::Option<fcitx::DirectTypeRewrite> delivery{
         this, "Delivery", _("How the word reaches the application"),
-        fcitx::DirectTypeRewrite::Auto};
+        fcitx::DirectTypeRewrite::Preedit};
     fcitx::Option<bool> autoRestore{this, "AutoRestore",
                                     _("Restore a word that is not Vietnamese"), true};
     fcitx::Option<bool> spellCheck{this, "SpellCheck",

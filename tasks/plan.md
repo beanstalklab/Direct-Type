@@ -92,6 +92,9 @@ direct typing through the C ABI (T4.2), then the language toggle (T4.3), configu
       or delete text, so the decision belongs to the word, not the keystroke
 - [x] **T4.11 `Auto` uses what each frontend can honour**: `Delivery` replaces the stale
       `Rewrite` key, XIM rewrites with forwarded keys, and `ClientPreedit` is gone
+- [x] **T4.12 Preedit by default**: a real session showed Chrome's address bar and Sublime
+      accepting commits while dropping deletions, which no capability flag reveals, so the
+      rewriting modes become an explicit choice and `Auto` is removed
 
 **Checkpoint G:** `./install.sh` on a clean machine, then `vieejt` types `việt` in a real
 application, on GNOME Wayland, KDE Wayland and X11.

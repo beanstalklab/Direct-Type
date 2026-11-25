@@ -1227,6 +1227,50 @@ DIRECTTYPE_DEBUG=1 fcitx5 --replace   # then type in each application
 `addon/src/engine.cpp`, `addon/tests/rewrite_check.cpp`, `addon/tests/config_check.cpp`
 **Scope:** M
 
+## T4.12 — Preedit by default, rewriting only on request
+
+**Description:** Typing `Đỗ Mạnh Hùng` in 0.0.7 produced `DĐoôỗ Manhạnh Hungùng` in Sublime
+Text and in Chrome's address bar, while Chrome's page content was correct and had no
+underline. The engine's answers per keystroke are `Đ`, `Đo`, `Đô`, `Đỗ`; an application that
+keeps every commit and applies no deletion shows exactly `DĐoôỗ`. The field accepts
+`commitString` and ignores `deleteSurroundingText`, and no capability flag says so — Chrome
+disagrees with itself between its page and its address bar. `Auto` was guessing and the guess
+cannot be made reliable, so it is removed.
+
+**Acceptance criteria:**
+- [x] `Delivery` defaults to `Preedit`: the word is always correct, underlined, committed at
+      the boundary
+- [x] `SurroundingText` and `Backspace` remain as explicit choices for an application known
+      to honour the deletion
+- [x] `Auto` and the per-word latch are deleted rather than left dead: with an explicit
+      setting there is nothing to latch, and `rewrite_check` disappears with them
+- [x] A stale `Rewrite=` file from 0.0.3–0.0.7 cannot override the new default
+      (`config_check`)
+- [x] `DIRECTTYPE_DEBUG=1 fcitx5 --replace` still reports program, frontend, surrounding-text
+      usability and delivery, once per word
+
+**Decisions recorded in this task:**
+
+- Correctness outranks the underline. A wrong word in the address bar is not a cosmetic
+  defect; an underline is. Every Linux IME lives with the preedit for this reason.
+- The rewriting modes stay in the settings because they do work in some places — Chrome's
+  page content among them — and a user who has seen one work can choose it. Making that
+  choice automatic would need to know which field of which application is in front of us,
+  which no protocol provides.
+- `docs/DESIGN-input-daemon.md` scopes the only frontend that can reach §1's goal without
+  the application's cooperation. It is not approved and not started.
+
+**Verification:**
+```bash
+ctest --test-dir addon/build --output-on-failure   # 4 cases
+DIRECTTYPE_DEBUG=1 fcitx5 --replace                # then type in each application
+```
+
+**Dependencies:** T4.11
+**Files:** `addon/src/config.h`, `addon/src/engine.h`, `addon/src/engine.cpp`,
+`addon/tests/config_check.cpp`, `addon/CMakeLists.txt`, `docs/DESIGN-input-daemon.md`
+**Scope:** S
+
 ### Checkpoint G — installable
 - [ ] `./install.sh` on a clean machine, then `vieejt` types `việt` in a real app
 - [ ] GNOME Wayland, KDE Wayland and X11 each verified by a human

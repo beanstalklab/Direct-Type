@@ -283,6 +283,19 @@ commands, and do not lower a check to get to green.
   preedit off hid the word entirely. `DIRECTTYPE_DEBUG=1 fcitx5 --replace` prints one line per
   word with the program, frontend, surrounding-text usability and chosen delivery. Package
   0.0.7.
+- **T4.12 done (from a real install of 0.0.7)**: typing `Đỗ Mạnh Hùng` produced
+  `DĐoôỗ Manhạnh Hungùng` in Sublime Text and in Chrome's address bar, while Chrome's page
+  content was correct and underline-free. The garbage is the signature of a commit accepted
+  and a deletion dropped: the engine's per-keystroke answers are `Đ`, `Đo`, `Đô`, `Đỗ`, and
+  an application that keeps every commit and applies no backspace shows `DĐoôỗ`. Capability
+  flags cannot reveal that, and Chrome disagrees with itself by field, so no per-context guess
+  can be right. `Auto` is therefore gone: `Delivery=Preedit` is the default and the only safe
+  one, with `SurroundingText` and `Backspace` left as explicit choices for an application
+  seen to honour the deletion. The per-word latch (`RewriteChoice`) went with `Auto`; with an
+  explicit setting there is nothing to latch. `DIRECTTYPE_DEBUG=1 fcitx5 --replace` still
+  prints one line per word: program, frontend, surrounding-text usability, delivery. Package
+  0.0.8. Goal 1 of §1 — no underline — needs a kernel-level frontend, scoped in
+  `docs/DESIGN-input-daemon.md`.
 - Checkpoint G remains the only thing left in Phase 4: install on a machine with fcitx5 and
   type `vieejt` in a real application — and now, specifically, in Sublime Text and a
   terminal, where the previous build failed.

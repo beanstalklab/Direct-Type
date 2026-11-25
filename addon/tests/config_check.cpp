@@ -108,6 +108,8 @@ int main() {
         check(configuration.autoRestore.value(), "auto_restore defaults to on");
         check(!configuration.spellCheck.value(), "spell_check defaults to off");
         check(configuration.freeToneMark.value(), "free_tone_mark defaults to on");
+        check(configuration.delivery.value() == fcitx::DirectTypeRewrite::Preedit,
+              "the word reaches the application through a preedit unless asked otherwise");
 
         // The options reach the ABI as the numbers `viet.h` documents. A wrong number here is
         // "VNI selected, Telex typed", which no other test would notice.
@@ -174,7 +176,7 @@ int main() {
 
         DirectTypeEngine upgraded;
         const directtype::DirectTypeConfig &settings = configurationOf(upgraded);
-        check(settings.delivery.value() == fcitx::DirectTypeRewrite::Auto,
+        check(settings.delivery.value() == fcitx::DirectTypeRewrite::Preedit,
               "a Rewrite= line from an older build does not override the new default");
         check(settings.method.value() == fcitx::DirectTypeMethod::Vni,
               "the settings that still exist are still read");
