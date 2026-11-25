@@ -9,11 +9,10 @@
 //! wanted and the fold places the mark once the word is complete.
 
 use crate::input::{
-    append_literal, horn_u_o_pair, horn_u_o_pair_at, mark_letter_at, mark_trailing, Origin,
-    RulePack,
+    append_literal, horn_u_o_pair_at, mark_letter_at, mark_trailing, Origin, RulePack,
 };
 use crate::syllable;
-use crate::unicode::{base_letter, LetterMark, Tone};
+use crate::unicode::{base_letter, compose, LetterMark, Tone};
 
 /// Full Telex: tone keys `s f r x j`, `z` removes a tone, and `w`, `aa`, `ee`, `oo`,
 /// `dd`, `[`, `]` add the quality diacritics.
@@ -159,22 +158,13 @@ fn append_w(output: &mut String, key: char, origin: Origin, more_letters_follow:
         return Origin::ModifierKey(key);
     };
 
-    let applied = match base_letter(previous).to_ascii_lowercase() {
-        'a' => mark_trailing(output, LetterMark::Breve, key, origin),
-        'u' => mark_trailing(output, LetterMark::Horn, key, origin),
-        'o' => horn_u_o_pair(output, key, origin, more_letters_follow),
-        // Not a letter `w` can mark; the look-back below decides.
-        _ => None,
-    };
-    if let Some(new_origin) = applied {
-        return new_origin;
-    }
-
     // `w` is Telex's utility key: a user types it at the end of the word as naturally as right
-    // after the vowel, so `ddonw` is `đơn` and `anw` is `ăn`. Look back for the last letter a
-    // horn or a breve can land on before giving up.
-    if let Some(new_origin) = mark_last_vowel(output, key, origin) {
-        return new_origin;
+    // after the vowel, so `anw` is `ăn` and `ddonw` is `đơn`. Which vowel it marks is decided
+    // by what the word can spell, not by which vowel is nearest — see `choose_marked_vowel`.
+    if let Some(index) = choose_marked_vowel(output, origin, more_letters_follow) {
+        if let Some(new_origin) = apply_mark_at(output, index, key, more_letters_follow, origin) {
+            return new_origin;
+        }
     }
 
     if syllable::is_vowel(previous) {
@@ -188,25 +178,132 @@ fn append_w(output: &mut String, key: char, origin: Origin, more_letters_follow:
     Origin::ModifierKey(key)
 }
 
-/// Mark the last letter of the word that a `w` can mark, and report where the mark went.
+/// Apply the mark `w` chooses to the letter at `index`.
 ///
-/// Searches backwards, so the vowel closest to the keystroke wins (`hoanw` is `hoăn`). The
-/// `uo` pair keeps its rule from the trailing case: horning the `o` of a `uo` also horns the
-/// `u`, which is why `dduongw` is `đương` and not `đuơng`.
-fn mark_last_vowel(output: &mut String, key: char, origin: Origin) -> Option<Origin> {
-    let mut target: Option<usize> = None;
-    for (index, character) in output.chars().enumerate() {
-        if matches!(base_letter(character).to_ascii_lowercase(), 'a' | 'o' | 'u') {
-            target = Some(index);
-        }
-    }
-    let index = target?;
+/// An `o` is the pair rule: horning it also horns the `u` in front of it, which is why
+/// `dduongw` is `đương` and not `đuơng`. The trailing `o` is the exception that keeps `uơ`
+/// (`thuow`), because that is the rhyme of `thuở` and `quơ`; the look-back case always horns
+/// the pair, since a letter after the `o` means the word goes on.
+fn apply_mark_at(
+    output: &mut String,
+    index: usize,
+    key: char,
+    more_letters_follow: bool,
+    origin: Origin,
+) -> Option<Origin> {
+    let trailing = index + 1 == output.chars().count();
     match base_letter(output.chars().nth(index)?).to_ascii_lowercase() {
         'a' => mark_letter_at(output, index, LetterMark::Breve, key, origin),
         'u' => mark_letter_at(output, index, LetterMark::Horn, key, origin),
-        'o' => horn_u_o_pair_at(output, index, key, origin, true),
+        'o' => horn_u_o_pair_at(output, index, key, origin, !trailing || more_letters_follow),
         _ => None,
     }
+}
+
+/// Which letter a `w` should mark, or `None` when it can mark none of them.
+///
+/// The nearest spelled result wins, searching leftwards from the end of the word: `hoanw` is
+/// `hoăn`, but `husaw` is not `huă` — the nearest vowel is the `a`, and a breve on it is not a
+/// rhyme — so the search moves to the `u` and `hưa` (`mưa`, `chưa`) is spelled, which makes
+/// the word `hứa`. The user typed the tone key before the letter, so the modifier has to
+/// repair the word from the right instead of trusting the nearest vowel.
+///
+/// When no candidate is spelled — an English word, or a word the engine cannot read yet — the
+/// nearest markable vowel is used anyway, which is the permissive behaviour this rule had
+/// before the spelling trial: dropping the modifier is worse than applying it plausibly.
+fn choose_marked_vowel(output: &str, origin: Origin, more_letters_follow: bool) -> Option<usize> {
+    // A second `w` on the letter the first one marked undoes it. That letter already carries
+    // the mark, so the trial below would never suggest it; `hoanww` is `hoanw`, not `hoănw`.
+    if let Origin::Marked {
+        mark, letter_index, ..
+    } = origin
+    {
+        if output.chars().nth(letter_index).and_then(mark_for_letter) == Some(mark) {
+            return Some(letter_index);
+        }
+    }
+
+    let mut candidates = [0usize; syllable::MAXIMUM_SYLLABLE_CHARACTERS];
+    let mut count = 0;
+    for (index, character) in output.chars().enumerate() {
+        if count < candidates.len() && mark_for_letter(character).is_some() {
+            candidates[count] = index;
+            count += 1;
+        }
+    }
+
+    let mut nearest_markable = None;
+    for index in candidates[..count].iter().rev().copied() {
+        nearest_markable.get_or_insert(index);
+        let mut trial = [0u8; 4 * syllable::MAXIMUM_SYLLABLE_CHARACTERS];
+        let Some(length) = write_marked_word(output, index, more_letters_follow, &mut trial) else {
+            continue;
+        };
+        let Ok(candidate) = std::str::from_utf8(&trial[..length]) else {
+            continue;
+        };
+        if crate::spelling::is_valid_syllable(candidate) {
+            return Some(index);
+        }
+    }
+    nearest_markable
+}
+
+/// Which mark a `w` puts on `letter`, if any.
+fn mark_for_letter(letter: char) -> Option<LetterMark> {
+    match base_letter(letter).to_ascii_lowercase() {
+        'a' => Some(LetterMark::Breve),
+        'u' | 'o' => Some(LetterMark::Horn),
+        _ => None,
+    }
+}
+
+/// Write `word` with the letter at `index` marked into `buffer`, and report how many bytes
+/// were written.
+///
+/// This is a trial, so it must produce exactly what applying the mark would: horning an `o`
+/// also horns the `u` in front of it, which is the difference between `đương` and `đưong`.
+/// It writes into a caller-owned buffer because a word can be long and the hot path may not
+/// allocate.
+fn write_marked_word(
+    word: &str,
+    index: usize,
+    more_letters_follow: bool,
+    buffer: &mut [u8],
+) -> Option<usize> {
+    let character_at_index = word.chars().nth(index)?;
+    let mark = mark_for_letter(character_at_index)?;
+    // The trial has to test the same pair the application will horn: a trailing `o` keeps its
+    // `u` unmarked when the word ends there (`thuow`), and horns it when the word goes on.
+    let trailing = index + 1 == word.chars().count();
+    let also_horn_u = !trailing || more_letters_follow;
+    let horning_o = also_horn_u
+        && mark == LetterMark::Horn
+        && base_letter(character_at_index).eq_ignore_ascii_case(&'o');
+
+    let mut length = 0;
+    for (position, character) in word.chars().enumerate() {
+        let marked = if position == index {
+            compose(character, mark)?
+        } else if horning_o
+            && position + 1 == index
+            && base_letter(character).eq_ignore_ascii_case(&'u')
+        {
+            // An `u` that already carries the horn keeps it; the pair may be half marked
+            // when the word was built by other keys.
+            compose(character, LetterMark::Horn).unwrap_or(character)
+        } else {
+            character
+        };
+        let mut encoded = [0u8; 4];
+        let bytes = marked.encode_utf8(&mut encoded).as_bytes();
+        if length + bytes.len() > buffer.len() {
+            return None;
+        }
+        buffer[length..length + bytes.len()].copy_from_slice(bytes);
+        length += bytes.len();
+    }
+    Some(length)
 }
 
 /// `ww → w`: a second `w` cancels the letter the first one produced. The letter that
@@ -370,6 +467,33 @@ mod tests {
         assert_eq!(transform("w"), "ư");
         // Undoing the look-back mark puts the vowel back and keeps the key where it was typed.
         assert_eq!(transform("ddonww"), "đonw");
+    }
+
+    #[test]
+    fn w_marks_the_vowel_the_word_can_spell() {
+        // The vowel nearest to `w` is not always the one it marks. In `husaw` it is the `a`,
+        // and a breve on it spells `huă`, which is not a rhyme; the `u` gives `hưa`, so the
+        // word is `hứa`. The tone key was typed before the letter, and the modifier has to
+        // repair the word from the right rather than trust the nearest vowel.
+        let cases = [
+            ("husaw", "hứa"),
+            ("huwas", "hứa"),
+            ("chusaw", "chứa"),
+            ("chuwas", "chứa"),
+            ("cuaw", "cưa"),
+            ("muaw", "mưa"),
+            ("thuaw", "thưa"),
+            ("huaw", "hưa"),
+            // `qu` is an onset, so its `u` is not a nucleus vowel to horn: `quaw` keeps `quă`.
+            ("quaw", "quă"),
+        ];
+        for (raw, expected) in cases {
+            assert_eq!(transform(raw), expected, "raw {raw:?}");
+        }
+        // A word with nothing spelled to find keeps the permissive answer: the nearest vowel
+        // gets the mark even though the result is not a rhyme (`fuă` is no syllable, so a
+        // boundary restores `fuaw`; the fold still has to put the mark somewhere).
+        assert_eq!(transform("fuaw"), "fuă");
     }
 
     #[test]

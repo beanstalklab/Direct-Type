@@ -76,3 +76,11 @@ hunw	hưn
 # Undoing the mark leaves `đonw`, which is not a syllable, so the boundary gives the
 # keystrokes back — the same rule as `aass`. The undo itself is pinned in the `telex` tests.
 ddonww	ddonww
+
+# The nearest vowel is not always the one `w` marks: a breve on the `a` behind a `u` is not a
+# rhyme (`huă`), so `w` horns the `u` instead. Reported from a real session, where `husaw`
+# came back as the raw keystrokes.
+cuaw	cưa
+muaw	mưa
+thuaw	thưa
+huaw	hưa

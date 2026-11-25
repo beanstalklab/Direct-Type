@@ -1077,6 +1077,44 @@ plus the human check, per application.
 `addon/src/engine.h`, `addon/src/engine.cpp`, `addon/tests/typing_check.cpp`
 **Scope:** M
 
+## T1.9 — `w` marks the vowel the word can spell
+
+**Description:** A real session typed `husaw` and got the raw keystrokes back. `w` marked the
+nearest vowel, which is the `a`: a breve on it spells `huă`, and `uă` is not a rhyme, so the
+word stopped being a syllable. `hưa` is a rhyme (`mưa`, `chưa`), so the `u` is the vowel the
+user meant, and the word should be `hứa`.
+
+**Acceptance criteria:**
+- [x] The look-back takes the nearest candidate whose marked word is a spelled syllable, and
+      falls back to the nearest markable vowel when none is
+- [x] `husaw → hứa`, `huwas → hứa`, `cusaw`-style orders too, in both tone styles
+- [x] `ddonw`, `anw`, `hoanw`, `dduongw`, `thuow`, `quaw` and `oow` keep their answers
+- [x] The trial writes into a fixed stack buffer: no allocation on the hot path
+- [x] `w_marks_the_vowel_the_word_can_spell` and 12 corpus cases; removing the trial fails the
+      unit test
+
+**Decisions recorded in this task:**
+
+- The trial uses the closed spelling inventory, which over-generates on purpose. That is the
+  right direction here too: a false positive only picks a plausible vowel, and the fallback
+  keeps the old permissive answer when nothing is spelled.
+- The `qu` and `gi` onsets need no special case: reading the word with the syllable parser
+  puts their `u`/`i` in the onset, so `quaw` still breve-izes the `a`.
+- VNI keeps the modifier next to the vowel it marks (`hu7a1` works, `hua17` does not); the
+  utility look-back is Telex's, and VNI users type the digit after the vowel. This is the
+  documented convention, not a regression.
+
+**Verification:**
+```bash
+cargo test -p viet-core
+cargo run -p viet-cli -- check tests/corpus
+```
+
+**Dependencies:** T1.2, T1.4
+**Files:** `crates/viet-core/src/telex.rs`, `tests/corpus/telex-letters.tsv`,
+`tests/corpus/telex-tone.tsv`, `tests/corpus/telex-tone-old.tsv`, `docs/SPEC-engine-core.md`
+**Scope:** S
+
 ## T4.9 — The strategy is decided per context
 
 **Description:** `Auto` resolves the strategy from the input context instead of the user

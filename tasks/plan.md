@@ -48,6 +48,8 @@ Each task ends with something you can type into and observe via `viet-cli`.
 
 - [x] **T1.7 VNI method**
 - [x] **T1.8 SimpleTelex method**
+- [x] **T1.9 `w` marks the vowel the word can spell**: `husaw → hứa`, not the raw keystrokes,
+      because `huă` is not a rhyme and `hưa` is
 
 **Checkpoint D:** every corpus file green (`telex-*`, `vni-*`, `simple-telex-*`, 630 cases); ≥ 2,000 cases still waits on Q2; no method-specific logic leaked into `tone.rs`. Phase 1 is complete apart from that target.
 

@@ -234,11 +234,18 @@ commands, and do not lower a check to get to green.
 - Also fixed while there: a toggle committed the word but left the engine's raw word alive,
   so the next keystroke continued it (`ádasd…`); toggling now resets the engine too.
 - **T1.2 rule extended from a real session**: `w` may be typed after the coda. It marks the
-  last vowel that can take a horn or a breve (`ddonw → đơn`, `anw → ăn`, `dduongw → đương`),
-  the letter-modifier half of the freedom tone keys have had since T1.4. Before this, `ddonw`
-  inserted `ư` after the `n`, failed to be a syllable, and `auto_restore` handed back the raw
-  keystrokes. `Origin::Marked` now records *which* letter a keystroke marked, because an undo
-  can no longer assume the end of the word. 638 corpus cases, 90 core tests.
+  nearest vowel whose mark spells a syllable, searching leftwards (`ddonw → đơn`, `anw → ăn`,
+  `dduongw → đương`), the letter-modifier half of the freedom tone keys have had since T1.4.
+  Before this, `ddonw` inserted `ư` after the `n`, failed to be a syllable, and `auto_restore`
+  handed back the raw keystrokes. `Origin::Marked` now records *which* letter a keystroke
+  marked, because an undo can no longer assume the end of the word.
+- **T1.9 done**: the nearest vowel is not always the one `w` should mark, so the search now
+  takes the first candidate whose marked word is a spelled syllable, and falls back to the
+  nearest markable vowel when none is. `husaw` used to come back as the raw keystrokes: `w`
+  gave the `a` a breve, spelling `huă`, which is not a rhyme, while the `u` gives `hưa`, so
+  the word is `hứa`. The `qu` onset is unaffected (`quaw → quă`), because the trial reads the
+  word with the syllable parser, not by counting vowels. The trial writes into a fixed stack
+  buffer, so the zero-allocation promise still holds. 650 corpus cases, 91 core tests.
 - A preedit option ships with it: `ClientPreedit` (default on) chooses between drawing the
   word in the text field and fcitx5's own preedit window, for applications that misplace the
   client-side one while typing fast.

@@ -187,3 +187,10 @@ VIEEJT	VIỆT
 # Words end at whitespace, so a tone cannot leak into the next word.
 toans hoas	toán hóa
 tieengs Vieejt	tiếng Việt
+
+# A tone key may come before the letter that finishes the rhyme, and `w` repairs the word
+# from the right: `husaw` is `hưa` plus sắc, so it is `hứa` and not the raw keystrokes.
+husaw	hứa
+huwas	hứa
+chusaw	chứa
+chuwas	chứa

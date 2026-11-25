@@ -33,7 +33,7 @@ Pre-alpha. What exists today:
   exit codes `0`/`1`/`2`).
 - `crates/viet-ffi` — a C ABI over the engine, with panics contained at the boundary;
   `crates/viet-ffi/tests/smoke.c` is a C caller linked against both library artifacts.
-- 638 corpus cases and CI that runs formatting, lint, tests and the corpus.
+- 650 corpus cases and CI that runs formatting, lint, tests and the corpus.
 
 The fcitx5 addon types through the engine, has its language toggle and its settings: one
 input method named "Direct Type", the word shown in a preedit and committed at the word

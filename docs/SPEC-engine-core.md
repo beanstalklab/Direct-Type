@@ -176,11 +176,16 @@ Letter modifiers in Telex, in the detail T1.2 pinned down:
   only spelling `thuở`, `quơ` and `huơ` have — an eager pair would make those words
   unreachable, and §3.6 lists `uơ` as a nucleus for exactly that reason.
 - `w` is a utility key and may be typed at the end of the word, not only next to the letter
-  it marks: it marks the last vowel that can take a horn or a breve (`ddonw → đơn`,
-  `anw → ăn`, `dduongw → đương`). This is the letter-modifier half of the freedom the tone
-  keys have had since T1.4, and it is the rule a real session needed: `ddonw` used to come
-  back as the raw keystrokes. A vowel that already carries a different mark keeps it and the
-  key stays literal (`oow → ôw`); after a consonant `w` is `ư` (`hw → hư`).
+  it marks: it marks the nearest vowel whose mark spells a syllable, searching leftwards
+  (`ddonw → đơn`, `anw → ăn`, `dduongw → đương`). The nearest vowel is not always the one
+  meant: in `husaw` a breve on the `a` spells `huă`, which is not a rhyme, while the `u`
+  gives `hưa`, so the word is `hứa`. The tone key may come before the letter that finishes
+  the rhyme, and the modifier repairs the word from the right. When no candidate spells
+  anything, the nearest markable vowel is marked anyway. This is the letter-modifier half of
+  the freedom the tone keys have had since T1.4, and it is the rule a real session needed:
+  `ddonw` used to come back as the raw keystrokes. A vowel that already carries a different
+  mark keeps it and the key stays literal (`oow → ôw`); after a consonant `w` is `ư`
+  (`hw → hư`).
 - `[` and `]` insert `ơ` and `ư` themselves; they are listed as letters above, not as a modification of a preceding letter (`a[` is `aơ`, not `ă`).
   With `auto_restore` on — the default — a word that only reaches an invalid
   spelling this way is given back at the boundary (`a[` → `a[`), which is §3.5.
